@@ -1,7 +1,40 @@
 """Utilities for creating and managing Discord embeds."""
 
+from typing import Dict, Any, Optional, Tuple
 import discord
 from config import EMBED_CONFIG
+
+
+def get_color_from_string(color_string: str) -> Optional[int]:
+    """Get color value from color name string."""
+    colors = EMBED_CONFIG["colors"]
+    return colors.get(color_string)
+
+
+def validate_embed_data(data: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    """Validate embed data against Discord limits."""
+    if "title" in data and data["title"]:
+        if len(data["title"]) > EMBED_CONFIG["limits"]["title"]:
+            return False, f"Title exceeds {EMBED_CONFIG['limits']['title']} chars"
+
+    if "description" in data and data["description"]:
+        if len(data["description"]) > EMBED_CONFIG["limits"]["description"]:
+            return False, f"Description exceeds {EMBED_CONFIG['limits']['description']} chars"
+
+    if "fields" in data and data["fields"]:
+        if len(data["fields"]) > EMBED_CONFIG["limits"]["max_fields"]:
+            return False, f"Max {EMBED_CONFIG['limits']['max_fields']} fields allowed"
+        for field in data["fields"]:
+            if len(field.get("name", "")) > EMBED_CONFIG["limits"]["field_name"]:
+                return False, f"Field name too long"
+            if len(field.get("value", "")) > EMBED_CONFIG["limits"]["field_value"]:
+                return False, f"Field value too long"
+
+    if "color" in data and data["color"]:
+        if not get_color_from_string(data["color"]):
+            return False, f"Invalid color: {data['color']}"
+
+    return True, None
 
 
 def validate_embed(title: str, description: str, fields: list = None) -> bool:
