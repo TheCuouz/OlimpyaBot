@@ -48,6 +48,103 @@ class AdminCog(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
 
+    @app_commands.command(name="kick")
+    async def kick(self, interaction: discord.Interaction, user: discord.User):
+        if not self._is_admin(interaction):
+            await self._send_error(interaction, "No tienes permisos")
+            return
+        try:
+            await interaction.guild.kick(user)
+            await self._send_success(interaction, f"{user.mention} expulsado")
+            logger.info(f"Kick {user} by {interaction.user}")
+        except Exception as e:
+            await self._send_error(interaction, str(e))
+
+    @app_commands.command(name="ban")
+    async def ban(self, interaction: discord.Interaction, user: discord.User):
+        if not self._is_admin(interaction):
+            await self._send_error(interaction, "No tienes permisos")
+            return
+        try:
+            await interaction.guild.ban(user)
+            await self._send_success(interaction, f"{user.mention} baneado")
+            logger.info(f"Ban {user} by {interaction.user}")
+        except Exception as e:
+            await self._send_error(interaction, str(e))
+
+    @app_commands.command(name="softban")
+    async def softban(self, interaction: discord.Interaction, user: discord.User):
+        if not self._is_admin(interaction):
+            await self._send_error(interaction, "No tienes permisos")
+            return
+        try:
+            await interaction.guild.ban(user, delete_message_days=7)
+            await interaction.guild.unban(user)
+            await self._send_success(interaction, f"{user.mention} softbaneado")
+            logger.info(f"Softban {user} by {interaction.user}")
+        except Exception as e:
+            await self._send_error(interaction, str(e))
+
+    @app_commands.command(name="mute")
+    async def mute(self, interaction: discord.Interaction, user: discord.User, duration: str):
+        if not self._is_admin(interaction):
+            await self._send_error(interaction, "No tienes permisos")
+            return
+        try:
+            import re
+            match = re.match(r"(\d+)([hmd])", duration.lower())
+            if not match:
+                await self._send_error(interaction, "Formato: 1h, 30m, 7d")
+                return
+            amount, unit = match.groups()
+            from datetime import timedelta
+            seconds = int(amount) * (3600 if unit == "h" else 60 if unit == "m" else 86400)
+            member = await interaction.guild.fetch_member(user.id)
+            await member.timeout(timedelta(seconds=seconds))
+            await self._send_success(interaction, f"{user.mention} muteado por {duration}")
+            logger.info(f"Mute {user} {duration} by {interaction.user}")
+        except Exception as e:
+            await self._send_error(interaction, str(e))
+
+    @app_commands.command(name="warn")
+    async def warn(self, interaction: discord.Interaction, user: discord.User, reason: str):
+        if not self._is_admin(interaction):
+            await self._send_error(interaction, "No tienes permisos")
+            return
+        try:
+            await self._send_success(interaction, f"{user.mention} advertido: {reason}")
+            logger.warning(f"Warn {user}: {reason} by {interaction.user}")
+        except Exception as e:
+            await self._send_error(interaction, str(e))
+
+    @app_commands.command(name="clear")
+    async def clear(self, interaction: discord.Interaction, type: str):
+        if not self._is_admin(interaction):
+            await self._send_error(interaction, "No tienes permisos")
+            return
+        if type not in ["embeds", "files", "links", "mentions"]:
+            await self._send_error(interaction, "Tipo: embeds, files, links, mentions")
+            return
+        await interaction.response.defer(ephemeral=True)
+        try:
+            count = 0
+            async for msg in interaction.channel.history(limit=100):
+                should_del = False
+                if type == "embeds" and msg.embeds:
+                    should_del = True
+                elif type == "files" and msg.attachments:
+                    should_del = True
+                elif type == "links" and ("http" in msg.content):
+                    should_del = True
+                elif type == "mentions" and msg.mentions:
+                    should_del = True
+                if should_del:
+                    await msg.delete()
+                    count += 1
+            await interaction.followup.send(f"✅ Eliminados {count} mensajes")
+        except Exception as e:
+            await interaction.followup.send(f"❌ {str(e)}")
+
 
 async def setup(bot: commands.Bot):
     """Load the admin cog."""
