@@ -5,10 +5,20 @@ import discord
 from config import EMBED_CONFIG
 
 
-def get_color_from_string(color_string: str) -> Optional[int]:
-    """Get color value from color name string."""
-    colors = EMBED_CONFIG["colors"]
-    return colors.get(color_string)
+async def is_valid_image_url(url: str) -> bool:
+    """Check if URL looks like a valid image URL."""
+    if not url:
+        return False
+    if not url.startswith(("http://", "https://")):
+        return False
+    valid_ext = (".png", ".jpg", ".jpeg", ".gif", ".webp")
+    return any(url.lower().endswith(ext) for ext in valid_ext)
+
+
+def get_color_from_string(color_name: str) -> Optional[int]:
+    """Convert color name to Discord int color."""
+    color_map = EMBED_CONFIG["colors"]
+    return color_map.get(color_name.lower() if color_name else "")
 
 
 def validate_embed_data(data: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
