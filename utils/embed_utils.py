@@ -1,6 +1,7 @@
 """Utilities for creating and managing Discord embeds."""
 
 from typing import Dict, Any, Optional, Tuple
+from datetime import datetime
 import discord
 from config import EMBED_CONFIG
 
@@ -111,3 +112,34 @@ def create_success_embed(message: str) -> discord.Embed:
         description=message,
         color="verde"
     )
+
+
+def create_embed_from_data(data: Dict[str, Any]) -> discord.Embed:
+    """Create a discord.Embed from validated data."""
+    color_int = None
+    if "color" in data and data["color"]:
+        color_int = get_color_from_string(data["color"])
+
+    embed = discord.Embed(
+        title=data.get("title"),
+        description=data.get("description"),
+        color=discord.Color(color_int) if color_int else discord.Color.default(),
+    )
+
+    if "author_name" in data and data["author_name"]:
+        embed.set_author(name=data["author_name"], icon_url=data.get("author_icon"))
+
+    if "footer_text" in data and data["footer_text"]:
+        embed.set_footer(text=data["footer_text"], icon_url=data.get("footer_icon"))
+
+    if data.get("timestamp"):
+        embed.timestamp = datetime.utcnow()
+
+    if "fields" in data and data["fields"]:
+        for field in data["fields"]:
+            embed.add_field(name=field.get("name", ""), value=field.get("value", ""))
+
+    if "image_url" in data and data["image_url"]:
+        embed.set_image(url=data["image_url"])
+
+    return embed
