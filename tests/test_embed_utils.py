@@ -1,7 +1,8 @@
 """Tests for embed_utils module."""
 
 import pytest
-from utils.embed_utils import validate_embed_data, get_color_from_string, is_valid_image_url
+import discord
+from utils.embed_utils import validate_embed_data, get_color_from_string, is_valid_image_url, create_embed_from_data
 
 
 def test_validate_embed_data_valid():
@@ -24,3 +25,12 @@ async def test_is_valid_image_url():
     """Test image URL validation."""
     assert await is_valid_image_url("https://example.com/image.png") is True
     assert await is_valid_image_url("invalid") is False
+
+
+def test_create_embed_from_data():
+    """Test create_embed_from_data creates proper Discord embeds."""
+    data = {"title": "Test", "description": "Desc", "color": "rojo"}
+    embed = create_embed_from_data(data)
+    assert isinstance(embed, discord.Embed)
+    assert embed.title == "Test"
+    assert embed.color == discord.Color(0xFF0000)
