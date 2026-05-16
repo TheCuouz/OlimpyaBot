@@ -7,14 +7,10 @@ from utils.logger import logger
 
 
 class AdminCog(commands.Cog):
-    """Admin commands for server management."""
+    """Comandos de administración del servidor."""
 
     def __init__(self, bot: commands.Bot):
-        """Initialize the admin cog."""
         self.bot = bot
-
-    def _is_admin(self, interaction: discord.Interaction) -> bool:
-        return interaction.user.guild_permissions.administrator
 
     async def _send_error(self, interaction: discord.Interaction, error: str):
         await interaction.response.send_message(f"❌ {error}", ephemeral=True)
@@ -23,130 +19,135 @@ class AdminCog(commands.Cog):
     async def _send_success(self, interaction: discord.Interaction, message: str):
         await interaction.response.send_message(f"✅ {message}", ephemeral=True)
 
-    @commands.command(name="ping")
-    @commands.is_owner()
-    async def ping(self, ctx: commands.Context):
-        """Check bot latency."""
-        latency = round(self.bot.latency * 1000)
-        await ctx.send(f"Pong! {latency}ms")
-        logger.info(f"Ping command executed by {ctx.author}")
-
-    @app_commands.command(name="purge")
-    @app_commands.describe(count="Number of messages to delete (1-100)")
-    async def purge(self, interaction: discord.Interaction, count: int):
-        if not self._is_admin(interaction):
-            await self._send_error(interaction, "No tienes permisos")
-            return
-        if count < 1 or count > 100:
-            await self._send_error(interaction, "Cuenta debe ser 1-100")
+    # ── PURGE ──────────────────────────────────────────────────────────────────
+    @app_commands.command(name="purge", description="Elimina un número de mensajes del canal")
+    @app_commands.describe(cantidad="Número de mensajes a eliminar (1-100)")
+    @app_commands.default_permissions(administrator=True)
+    async def purge(self, interaction: discord.Interaction, cantidad: int):
+        if cantidad < 1 or cantidad > 100:
+            await self._send_error(interaction, "La cantidad debe estar entre 1 y 100")
             return
         await interaction.response.defer(ephemeral=True)
         try:
-            deleted = await interaction.channel.purge(limit=count)
-            await interaction.followup.send(f"✅ Eliminados {len(deleted)} mensajes")
-            logger.info(f"Purge {len(deleted)} by {interaction.user}")
+            deleted = await interaction.channel.purge(limit=cantidad)
+            await interaction.followup.send(f"✅ Eliminados {len(deleted)} mensajes", ephemeral=True)
+            logger.info(f"Purge {len(deleted)} mensajes por {interaction.user}")
         except Exception as e:
             await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
 
-    @app_commands.command(name="kick")
-    async def kick(self, interaction: discord.Interaction, user: discord.User):
-        if not self._is_admin(interaction):
-            await self._send_error(interaction, "No tienes permisos")
-            return
+    # ── NUKE ───────────────────────────────────────────────────────────────────
+    @app_commands.command(name="nuke", description="Vacía el canal por completo clonándolo y eliminando el original")
+    @app_commands.default_permissions(administrator=True)
+    async def nuke(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        canal = interaction.channel
         try:
-            await interaction.guild.kick(user)
-            await self._send_success(interaction, f"{user.mention} expulsado")
-            logger.info(f"Kick {user} by {interaction.user}")
+            nuevo = await canal.clone(reason=f"Nuke por {interaction.user}")
+            await nuevo.move(beginning=True, offset=canal.position)
+            await canal.delete(reason=f"Nuke por {interaction.user}")
+            await nuevo.send("💥 Canal limpiado.", delete_after=5)
+            logger.info(f"Nuke canal #{canal.name} por {interaction.user}")
+        except Exception as e:
+            await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
+
+    # ── KICK ───────────────────────────────────────────────────────────────────
+    @app_commands.command(name="kick", description="Expulsa a un usuario del servidor")
+    @app_commands.describe(usuario="Usuario a expulsar", razon="Motivo de la expulsión")
+    @app_commands.default_permissions(administrator=True)
+    async def kick(self, interaction: discord.Interaction, usuario: discord.Member, razon: str = "Sin motivo"):
+        try:
+            await interaction.guild.kick(usuario, reason=razon)
+            await self._send_success(interaction, f"{usuario.mention} expulsado — {razon}")
+            logger.info(f"Kick {usuario} por {interaction.user}: {razon}")
         except Exception as e:
             await self._send_error(interaction, str(e))
 
-    @app_commands.command(name="ban")
-    async def ban(self, interaction: discord.Interaction, user: discord.User):
-        if not self._is_admin(interaction):
-            await self._send_error(interaction, "No tienes permisos")
-            return
+    # ── BAN ────────────────────────────────────────────────────────────────────
+    @app_commands.command(name="ban", description="Banea a un usuario del servidor")
+    @app_commands.describe(usuario="Usuario a banear", razon="Motivo del ban")
+    @app_commands.default_permissions(administrator=True)
+    async def ban(self, interaction: discord.Interaction, usuario: discord.Member, razon: str = "Sin motivo"):
         try:
-            await interaction.guild.ban(user)
-            await self._send_success(interaction, f"{user.mention} baneado")
-            logger.info(f"Ban {user} by {interaction.user}")
+            await interaction.guild.ban(usuario, reason=razon)
+            await self._send_success(interaction, f"{usuario.mention} baneado — {razon}")
+            logger.info(f"Ban {usuario} por {interaction.user}: {razon}")
         except Exception as e:
             await self._send_error(interaction, str(e))
 
-    @app_commands.command(name="softban")
-    async def softban(self, interaction: discord.Interaction, user: discord.User):
-        if not self._is_admin(interaction):
-            await self._send_error(interaction, "No tienes permisos")
-            return
+    # ── SOFTBAN ────────────────────────────────────────────────────────────────
+    @app_commands.command(name="softban", description="Banea y desbanea a un usuario eliminando sus mensajes recientes")
+    @app_commands.describe(usuario="Usuario a softbanear", razon="Motivo")
+    @app_commands.default_permissions(administrator=True)
+    async def softban(self, interaction: discord.Interaction, usuario: discord.Member, razon: str = "Sin motivo"):
         try:
-            await interaction.guild.ban(user, delete_message_days=7)
-            await interaction.guild.unban(user)
-            await self._send_success(interaction, f"{user.mention} softbaneado")
-            logger.info(f"Softban {user} by {interaction.user}")
+            await interaction.guild.ban(usuario, delete_message_days=7, reason=razon)
+            await interaction.guild.unban(usuario, reason="Softban")
+            await self._send_success(interaction, f"{usuario.mention} softbaneado — {razon}")
+            logger.info(f"Softban {usuario} por {interaction.user}")
         except Exception as e:
             await self._send_error(interaction, str(e))
 
-    @app_commands.command(name="mute")
-    async def mute(self, interaction: discord.Interaction, user: discord.User, duration: str):
-        if not self._is_admin(interaction):
-            await self._send_error(interaction, "No tienes permisos")
+    # ── MUTE ───────────────────────────────────────────────────────────────────
+    @app_commands.command(name="mute", description="Silencia a un usuario durante un tiempo (ej: 10m, 2h, 1d)")
+    @app_commands.describe(usuario="Usuario a silenciar", duracion="Duración: 10m, 2h, 1d...")
+    @app_commands.default_permissions(administrator=True)
+    async def mute(self, interaction: discord.Interaction, usuario: discord.Member, duracion: str):
+        import re
+        from datetime import timedelta
+        match = re.match(r"(\d+)([hmd])", duracion.lower())
+        if not match:
+            await self._send_error(interaction, "Formato incorrecto. Usa: 10m, 2h, 1d")
             return
         try:
-            import re
-            match = re.match(r"(\d+)([hmd])", duration.lower())
-            if not match:
-                await self._send_error(interaction, "Formato: 1h, 30m, 7d")
-                return
             amount, unit = match.groups()
-            from datetime import timedelta
-            seconds = int(amount) * (3600 if unit == "h" else 60 if unit == "m" else 86400)
-            member = await interaction.guild.fetch_member(user.id)
-            await member.timeout(timedelta(seconds=seconds))
-            await self._send_success(interaction, f"{user.mention} muteado por {duration}")
-            logger.info(f"Mute {user} {duration} by {interaction.user}")
+            segundos = int(amount) * (3600 if unit == "h" else 60 if unit == "m" else 86400)
+            await usuario.timeout(timedelta(seconds=segundos), reason=f"Mute por {interaction.user}")
+            await self._send_success(interaction, f"{usuario.mention} silenciado por {duracion}")
+            logger.info(f"Mute {usuario} {duracion} por {interaction.user}")
         except Exception as e:
             await self._send_error(interaction, str(e))
 
-    @app_commands.command(name="warn")
-    async def warn(self, interaction: discord.Interaction, user: discord.User, reason: str):
-        if not self._is_admin(interaction):
-            await self._send_error(interaction, "No tienes permisos")
-            return
+    # ── WARN ───────────────────────────────────────────────────────────────────
+    @app_commands.command(name="warn", description="Advierte a un usuario con un motivo")
+    @app_commands.describe(usuario="Usuario a advertir", motivo="Motivo de la advertencia")
+    @app_commands.default_permissions(administrator=True)
+    async def warn(self, interaction: discord.Interaction, usuario: discord.Member, motivo: str):
         try:
-            await self._send_success(interaction, f"{user.mention} advertido: {reason}")
-            logger.warning(f"Warn {user}: {reason} by {interaction.user}")
+            await self._send_success(interaction, f"{usuario.mention} advertido: {motivo}")
+            logger.warning(f"Warn {usuario}: {motivo} por {interaction.user}")
         except Exception as e:
             await self._send_error(interaction, str(e))
 
-    @app_commands.command(name="clear")
-    async def clear(self, interaction: discord.Interaction, type: str):
-        if not self._is_admin(interaction):
-            await self._send_error(interaction, "No tienes permisos")
-            return
-        if type not in ["embeds", "files", "links", "mentions"]:
-            await self._send_error(interaction, "Tipo: embeds, files, links, mentions")
+    # ── CLEAR (por tipo) ───────────────────────────────────────────────────────
+    @app_commands.command(name="clear", description="Elimina mensajes del canal según su tipo")
+    @app_commands.describe(tipo="Tipo de mensajes: embeds, archivos, links, menciones")
+    @app_commands.default_permissions(administrator=True)
+    async def clear(self, interaction: discord.Interaction, tipo: str):
+        opciones = ["embeds", "archivos", "links", "menciones"]
+        if tipo not in opciones:
+            await self._send_error(interaction, f"Tipo inválido. Opciones: {', '.join(opciones)}")
             return
         await interaction.response.defer(ephemeral=True)
         try:
             count = 0
             async for msg in interaction.channel.history(limit=100):
-                should_del = False
-                if type == "embeds" and msg.embeds:
-                    should_del = True
-                elif type == "files" and msg.attachments:
-                    should_del = True
-                elif type == "links" and ("http" in msg.content):
-                    should_del = True
-                elif type == "mentions" and msg.mentions:
-                    should_del = True
-                if should_del:
+                borrar = False
+                if tipo == "embeds" and msg.embeds:
+                    borrar = True
+                elif tipo == "archivos" and msg.attachments:
+                    borrar = True
+                elif tipo == "links" and "http" in msg.content:
+                    borrar = True
+                elif tipo == "menciones" and msg.mentions:
+                    borrar = True
+                if borrar:
                     await msg.delete()
                     count += 1
-            await interaction.followup.send(f"✅ Eliminados {count} mensajes")
+            await interaction.followup.send(f"✅ Eliminados {count} mensajes de tipo '{tipo}'", ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f"❌ {str(e)}")
+            await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
-    """Load the admin cog."""
     await bot.add_cog(AdminCog(bot))
     logger.info("AdminCog loaded")
