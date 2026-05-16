@@ -13,19 +13,13 @@ log_filename = os.path.join(
 logger = logging.getLogger("OlimpyaBot")
 logger.setLevel(logging.DEBUG)
 
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-
-file_handler = logging.FileHandler(log_filename)
+# Solo file handler — evita problemas de encoding en consola Windows
+file_handler = logging.FileHandler(log_filename, encoding='utf-8')
 file_handler.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter(
     "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-
-console_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
-
-logger.addHandler(console_handler)
 logger.addHandler(file_handler)
