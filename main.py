@@ -19,7 +19,8 @@ class OlimpyaBot(commands.Bot):
 
     async def setup_hook(self):
         await self.load_cogs()
-        logger.info("Cogs cargados exitosamente")
+        await self.tree.sync()
+        logger.info("Cogs cargados y slash commands sincronizados")
 
     async def load_cogs(self):
         cogs_dir = "cogs"
