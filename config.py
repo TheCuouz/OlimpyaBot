@@ -22,8 +22,8 @@ RESPONSES = {
 
 TICKET_CONFIG = {
     "enabled": True,
-    "categories": ["Bug", "Support", "Feature Request"],
-    "priorities": ["Low", "Medium", "High", "Critical"],
+    "categories": ["Bug", "Soporte", "Sugerencia"],
+    "priorities": ["Baja", "Media", "Alta", "Crítica"],
     "staff_role_name": "Staff",
     "data_file": "data/tickets.json",
 }
