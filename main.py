@@ -2,6 +2,7 @@ import asyncio
 import discord
 from discord.ext import commands
 import os
+import traceback
 from config import DISCORD_TOKEN
 from utils.logger import logger
 
@@ -11,7 +12,7 @@ class OlimpyaBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.guild_messages = True
-        intents.direct_messages = True
+        intents.dm_messages = True
 
         super().__init__(command_prefix="!", intents=intents)
         self.synced = False
