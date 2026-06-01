@@ -3,6 +3,7 @@ from discord.ext import commands
 from utils.logger import logger
 from config import (
     AUTOROLE_ID, WELCOME_CHANNEL_ID, CHAT_CHANNEL_ID, PRESENTACIONES_CHANNEL_ID,
+    COMIENZA_AQUI_CHANNEL_ID,
 )
 
 
@@ -62,6 +63,7 @@ class Events(commands.Cog):
         if channel is None:
             logger.warning(f"Bienvenida: canal {WELCOME_CHANNEL_ID} no encontrado")
             return
+        comienza = f"<#{COMIENZA_AQUI_CHANNEL_ID}>" if COMIENZA_AQUI_CHANNEL_ID else "#comienza-aquí"
         presentaciones = f"<#{PRESENTACIONES_CHANNEL_ID}>" if PRESENTACIONES_CHANNEL_ID else "#presentaciones"
         chat = f"<#{CHAT_CHANNEL_ID}>" if CHAT_CHANNEL_ID else "el chat"
         embed = discord.Embed(
@@ -70,7 +72,9 @@ class Events(commands.Cog):
                 f"¡Hola {member.mention}! Qué ilusión tenerte por aquí ✨\n\n"
                 "Esto es **JournalByTTS**, la comunidad de **The Trader's Stop** 💛 "
                 "Traders que van en serio… pero sin agobios. Aquí venimos a mejorar **juntos** 📈\n\n"
-                f"🧭 Preséntate en {presentaciones} y cuéntanos tu par favorito y en qué cuenta operas.\n"
+                f"📌 **Lo primero y más importante:** pásate por {comienza}. Ahí tienes todo "
+                "lo que necesitas para empezar con buen pie.\n"
+                f"🧭 Luego preséntate en {presentaciones} y cuéntanos tu par favorito y en qué cuenta operas.\n"
                 f"💬 Pásate por {chat} a charlar y **hacer amigos traders** — aquí se forman muy buenas migas.\n"
                 "🎥 No te pierdas los **directos**, se aprende un montón y se pasa genial.\n\n"
                 "Cualquier cosa que necesites, estoy por aquí para ayudarte. ¡Un abrazo enorme! 🫶"
