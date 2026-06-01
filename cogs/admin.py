@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from utils.logger import logger
+from config import AUTOROLE_ID
 
 
 class AdminCog(commands.Cog):
@@ -144,6 +145,43 @@ class AdminCog(commands.Cog):
                     await msg.delete()
                     count += 1
             await interaction.followup.send(f"✅ Eliminados {count} mensajes de tipo '{tipo}'", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
+
+    # ── SYNCROLES ──────────────────────────────────────────────────────────────
+    @app_commands.command(name="syncroles", description="Asigna el rol de autorol a todos los miembros que aún no lo tienen")
+    @app_commands.default_permissions(administrator=True)
+    async def syncroles(self, interaction: discord.Interaction):
+        role = interaction.guild.get_role(AUTOROLE_ID)
+        if role is None:
+            await self._send_error(interaction, f"No encuentro el rol {AUTOROLE_ID} en este servidor.")
+            return
+        await interaction.response.defer(ephemeral=True)
+        asignados = ya = fallos = 0
+        try:
+            async for member in interaction.guild.fetch_members(limit=None):
+                if member.bot:
+                    continue
+                if role in member.roles:
+                    ya += 1
+                    continue
+                try:
+                    await member.add_roles(role, reason=f"syncroles por {interaction.user}")
+                    asignados += 1
+                except discord.Forbidden:
+                    fallos += 1
+                except Exception:
+                    fallos += 1
+            await interaction.followup.send(
+                f"✅ Sincronizado **{role.name}** — asignados: {asignados} · ya lo tenían: {ya} · fallos: {fallos}",
+                ephemeral=True,
+            )
+            logger.info(f"syncroles por {interaction.user}: +{asignados}, ya {ya}, fallos {fallos}")
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "❌ Sin permisos para leer miembros o asignar el rol. Revisa 'Gestionar roles' y la jerarquía.",
+                ephemeral=True,
+            )
         except Exception as e:
             await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
 
