@@ -6,6 +6,10 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
+# Rol que se asigna automáticamente al entrar un nuevo miembro (autorol).
+# Configurable por entorno; por defecto el rol "Trader" del servidor de JBT.
+AUTOROLE_ID = int(os.getenv("AUTOROLE_ID", "1313934184150208562") or 0)
+
 if not DISCORD_TOKEN:
     raise ValueError("DISCORD_TOKEN no está configurado en el archivo .env")
 

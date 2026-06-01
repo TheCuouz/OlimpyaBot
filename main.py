@@ -13,6 +13,7 @@ class OlimpyaBot(commands.Bot):
         intents.message_content = True
         intents.guild_messages = True
         intents.dm_messages = True
+        intents.members = True  # necesario para on_member_join (autorol al entrar)
 
         super().__init__(command_prefix="!", intents=intents)
         self.synced = False
