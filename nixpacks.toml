@@ -2,4 +2,4 @@
 providers = ["python"]
 
 [start]
-cmd = "python main.py"
+cmd = "python3 main.py"
