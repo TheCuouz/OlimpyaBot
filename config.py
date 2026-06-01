@@ -10,6 +10,9 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 # Configurable por entorno; por defecto el rol "Trader" del servidor de JBT.
 AUTOROLE_ID = int(os.getenv("AUTOROLE_ID", "1313934184150208562") or 0)
 
+# Canal donde Olimpya da la bienvenida a cada nuevo miembro.
+WELCOME_CHANNEL_ID = int(os.getenv("WELCOME_CHANNEL_ID", "1313954374799720489") or 0)
+
 if not DISCORD_TOKEN:
     raise ValueError("DISCORD_TOKEN no está configurado en el archivo .env")
 
