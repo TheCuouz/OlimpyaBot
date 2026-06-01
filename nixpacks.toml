@@ -1,0 +1,5 @@
+# Fuerza a Railway/Nixpacks a tratar este repo como Python (fue migrado de Java).
+providers = ["python"]
+
+[start]
+cmd = "python main.py"
