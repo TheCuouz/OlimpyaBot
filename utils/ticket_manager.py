@@ -71,6 +71,12 @@ class TicketManager:
             if ticket["ticket_id"] == ticket_id:
                 return ticket
         return None
+
+    def get_ticket_by_channel(self, channel_id: int) -> Optional[Dict]:
+        for ticket in self.data["tickets"]:
+            if ticket.get("channel_id") == channel_id:
+                return ticket
+        return None
     
     def update_ticket(self, ticket_id: str, updates: Dict):
         ticket = self.get_ticket(ticket_id)

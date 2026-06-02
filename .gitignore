@@ -140,3 +140,6 @@ Thumbs.db
 # Ticket data
 data/*.json
 !data/.gitkeep
+
+# Debug scripts sueltos
+debug_*.py

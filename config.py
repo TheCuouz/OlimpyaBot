@@ -26,17 +26,16 @@ INTENTS = {
     "DIRECT_MESSAGES": True,
 }
 
-RESPONSES = {
-    "desidia": "Que pasa perro?",
-}
-
+# Carpeta persistente. En Railway se monta un volumen y se define DATA_DIR=/data;
+# en local cae a ./data. Así los tickets sobreviven a cada redeploy.
+DATA_DIR = os.getenv("DATA_DIR", "data")
 
 TICKET_CONFIG = {
     "enabled": True,
     "categories": ["Bug", "Soporte", "Sugerencia"],
     "priorities": ["Baja", "Media", "Alta", "Crítica"],
     "staff_role_name": "Staff",
-    "data_file": "data/tickets.json",
+    "data_file": os.path.join(DATA_DIR, "tickets.json"),
 }
 
 EMBED_CONFIG = {

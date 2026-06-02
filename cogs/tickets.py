@@ -1,3 +1,5 @@
+from typing import Optional
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -5,58 +7,62 @@ from utils.logger import logger
 from utils.ticket_manager import TicketManager
 from utils.ticket_utils import (
     create_ticket_embed, create_setup_embed, create_action_embed,
-    create_ticket_channel, archive_channel, get_staff_role, user_is_staff
+    create_welcome_message, create_ticket_channel, archive_channel,
+    get_staff_role, user_is_staff,
 )
 from config import TICKET_CONFIG
 
 
 class TicketModal(discord.ui.Modal, title="Crear ticket de soporte"):
+    motivo = discord.ui.TextInput(
+        label="Motivo",
+        placeholder="Resumen breve del ticket",
+        style=discord.TextStyle.short,
+        required=True,
+        min_length=3,
+        max_length=100,
+    )
     descripcion = discord.ui.TextInput(
         label="Descripción",
         placeholder="Describe tu problema en detalle",
         style=discord.TextStyle.paragraph,
         required=True,
         min_length=10,
-        max_length=1000
+        max_length=1000,
     )
 
-    def __init__(self, ticket_cog: 'Tickets'):
+    def __init__(self, ticket_cog: 'Tickets', categoria: str, prioridad: str):
         super().__init__()
         self.ticket_cog = ticket_cog
-        self.selected_category = None
-        self.selected_priority = None
+        self.categoria = categoria
+        self.prioridad = prioridad
 
     async def on_submit(self, interaction: discord.Interaction):
-        if not self.selected_category:
-            self.selected_category = TICKET_CONFIG["categories"][0]
-        if not self.selected_priority:
-            self.selected_priority = TICKET_CONFIG["priorities"][0]
-
         await interaction.response.defer(ephemeral=True)
 
         try:
             ticket_id = self.ticket_cog.ticket_manager.create_ticket(
                 creator_id=interaction.user.id,
                 creator_name=interaction.user.name,
-                category=self.selected_category,
-                priority=self.selected_priority,
-                title=self.descripcion.value[:50] if self.descripcion.value else "Sin título",
-                description=self.descripcion.value
+                category=self.categoria,
+                priority=self.prioridad,
+                title=self.motivo.value,
+                description=self.descripcion.value,
             )
 
             staff_role = get_staff_role(interaction.guild, TICKET_CONFIG["staff_role_name"])
             channel = await create_ticket_channel(
                 interaction.guild,
                 ticket_id,
-                self.descripcion.value[:30],
+                self.motivo.value,
                 interaction.user,
-                staff_role
+                staff_role,
             )
 
             if not channel:
                 await interaction.followup.send(
                     "❌ No se pudo crear el canal del ticket. Inténtalo de nuevo.",
-                    ephemeral=True
+                    ephemeral=True,
                 )
                 return
 
@@ -65,56 +71,161 @@ class TicketModal(discord.ui.Modal, title="Crear ticket de soporte"):
             ticket = self.ticket_cog.ticket_manager.get_ticket(ticket_id)
             embed = create_ticket_embed(ticket)
             view = self.ticket_cog.create_ticket_buttons(ticket_id)
+            welcome = create_welcome_message(interaction.user, ticket, staff_role)
 
-            await channel.send(embed=embed, view=view)
+            await channel.send(
+                content=welcome,
+                embed=embed,
+                view=view,
+                allowed_mentions=discord.AllowedMentions(users=True, roles=True),
+            )
             await interaction.followup.send(
                 f"✅ Ticket creado. Canal: {channel.mention}",
-                ephemeral=True
+                ephemeral=True,
             )
             logger.info(f"Ticket {ticket_id} creado por {interaction.user.name}")
 
         except Exception as e:
-            logger.error(f"Error al crear ticket: {e}")
+            logger.error(f"Error al crear ticket: {e}", exc_info=True)
             await interaction.followup.send(
                 "❌ Ocurrió un error al crear el ticket. Inténtalo de nuevo.",
-                ephemeral=True
+                ephemeral=True,
             )
 
 
+def _get_tickets_cog(interaction: discord.Interaction) -> Optional['Tickets']:
+    cog = interaction.client.get_cog("Tickets")
+    return cog  # type: ignore[return-value]
+
+
 class TicketButtonView(discord.ui.View):
-    def __init__(self, ticket_cog: 'Tickets', ticket_id: str):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.ticket_cog = ticket_cog
-        self.ticket_id = ticket_id
 
-    @discord.ui.button(label="Cerrar", style=discord.ButtonStyle.danger, emoji="🔒")
+    async def _resolve_ticket_id(self, interaction: discord.Interaction) -> Optional[str]:
+        cog = _get_tickets_cog(interaction)
+        if not cog:
+            await interaction.response.send_message("❌ Sistema de tickets no disponible.", ephemeral=True)
+            return None
+        ticket = cog.ticket_manager.get_ticket_by_channel(interaction.channel.id)
+        if not ticket:
+            await interaction.response.send_message("❌ Este canal no es un ticket válido.", ephemeral=True)
+            return None
+        return ticket["ticket_id"]
+
+    @discord.ui.button(label="Cerrar", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="olimpya:ticket:close")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.ticket_cog.close_ticket(interaction, self.ticket_id)
+        ticket_id = await self._resolve_ticket_id(interaction)
+        if ticket_id:
+            await _get_tickets_cog(interaction).close_ticket(interaction, ticket_id)
 
-    @discord.ui.button(label="Reabrir", style=discord.ButtonStyle.primary, emoji="🔓")
+    @discord.ui.button(label="Reabrir", style=discord.ButtonStyle.primary, emoji="🔓", custom_id="olimpya:ticket:reopen")
     async def reopen_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.ticket_cog.reopen_ticket(interaction, self.ticket_id)
+        ticket_id = await self._resolve_ticket_id(interaction)
+        if ticket_id:
+            await _get_tickets_cog(interaction).reopen_ticket(interaction, ticket_id)
 
-    @discord.ui.button(label="Asignar", style=discord.ButtonStyle.success, emoji="👤")
+    @discord.ui.button(label="Asignar", style=discord.ButtonStyle.success, emoji="👤", custom_id="olimpya:ticket:assign")
     async def assign_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.ticket_cog.assign_ticket(interaction, self.ticket_id)
+        ticket_id = await self._resolve_ticket_id(interaction)
+        if ticket_id:
+            await _get_tickets_cog(interaction).assign_ticket(interaction, ticket_id)
+
+
+class TicketSetupView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+        self.categoria: Optional[str] = None
+        self.prioridad: Optional[str] = None
+
+        cat_options = [discord.SelectOption(label=c, value=c) for c in TICKET_CONFIG["categories"]]
+        self.cat_select = discord.ui.Select(
+            placeholder="Elige una categoría...",
+            options=cat_options,
+            row=0,
+            min_values=1,
+            max_values=1,
+        )
+        self.cat_select.callback = self._on_cat
+        self.add_item(self.cat_select)
+
+        pri_options = [discord.SelectOption(label=p, value=p) for p in TICKET_CONFIG["priorities"]]
+        self.pri_select = discord.ui.Select(
+            placeholder="Elige una prioridad...",
+            options=pri_options,
+            row=1,
+            min_values=1,
+            max_values=1,
+        )
+        self.pri_select.callback = self._on_pri
+        self.add_item(self.pri_select)
+
+        self.continue_btn = discord.ui.Button(
+            label="Continuar",
+            style=discord.ButtonStyle.success,
+            emoji="➡️",
+            disabled=True,
+            row=2,
+        )
+        self.continue_btn.callback = self._on_continue
+        self.add_item(self.continue_btn)
+
+    def _refresh_continue(self):
+        self.continue_btn.disabled = not (self.categoria and self.prioridad)
+
+    def _mark_selected(self, select: discord.ui.Select, value: str):
+        for opt in select.options:
+            opt.default = (opt.value == value)
+
+    async def _on_cat(self, interaction: discord.Interaction):
+        self.categoria = self.cat_select.values[0]
+        self._mark_selected(self.cat_select, self.categoria)
+        self._refresh_continue()
+        await interaction.response.edit_message(view=self)
+
+    async def _on_pri(self, interaction: discord.Interaction):
+        self.prioridad = self.pri_select.values[0]
+        self._mark_selected(self.pri_select, self.prioridad)
+        self._refresh_continue()
+        await interaction.response.edit_message(view=self)
+
+    async def _on_continue(self, interaction: discord.Interaction):
+        cog = _get_tickets_cog(interaction)
+        if not cog:
+            await interaction.response.send_message("❌ Sistema de tickets no disponible.", ephemeral=True)
+            return
+        if not (self.categoria and self.prioridad):
+            await interaction.response.send_message("❌ Selecciona categoría y prioridad primero.", ephemeral=True)
+            return
+        await interaction.response.send_modal(TicketModal(cog, self.categoria, self.prioridad))
 
 
 class CreateTicketView(discord.ui.View):
-    def __init__(self, ticket_cog: 'Tickets'):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.ticket_cog = ticket_cog
 
-    @discord.ui.button(label="Crear Ticket", style=discord.ButtonStyle.primary, emoji="📝")
+    @discord.ui.button(label="Crear Ticket", style=discord.ButtonStyle.primary, emoji="📝", custom_id="olimpya:ticket:create")
     async def create_ticket_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(TicketModal(self.ticket_cog))
+        await interaction.response.send_message(
+            "**Configura tu ticket**\nElige categoría y prioridad y pulsa Continuar para rellenar el motivo.",
+            view=TicketSetupView(),
+            ephemeral=True,
+        )
 
 
 class Tickets(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.ticket_manager = TicketManager(TICKET_CONFIG["data_file"])
+        self._views_registered = False
         logger.info("Tickets cog initialized")
+
+    async def cog_load(self):
+        if not self._views_registered:
+            self.bot.add_view(CreateTicketView())
+            self.bot.add_view(TicketButtonView())
+            self._views_registered = True
+            logger.info("Vistas persistentes de tickets registradas")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -125,7 +236,7 @@ class Tickets(commands.Cog):
     async def setup_tickets(self, interaction: discord.Interaction):
         try:
             embed = create_setup_embed()
-            view = CreateTicketView(self)
+            view = CreateTicketView()
             await interaction.response.send_message(embed=embed, view=view)
             logger.info(f"Sistema de tickets configurado en {interaction.guild.name} por {interaction.user.name}")
         except Exception as e:
@@ -136,7 +247,7 @@ class Tickets(commands.Cog):
             )
 
     def create_ticket_buttons(self, ticket_id: str) -> TicketButtonView:
-        return TicketButtonView(self, ticket_id)
+        return TicketButtonView()
 
     async def close_ticket(self, interaction: discord.Interaction, ticket_id: str):
         await interaction.response.defer(ephemeral=True)
@@ -191,6 +302,15 @@ class Tickets(commands.Cog):
                     await channel.edit(name=new_name)
                 except Exception:
                     pass
+                # Devuelve la escritura al creador (al cerrar se le había quitado).
+                creator = interaction.guild.get_member(ticket["creator_id"])
+                if creator:
+                    try:
+                        await channel.set_permissions(
+                            creator, read_messages=True, send_messages=True
+                        )
+                    except Exception:
+                        pass
 
             action_embed = create_action_embed("Reabierto", interaction.user.name)
             await interaction.followup.send(embed=action_embed, ephemeral=True)
