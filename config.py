@@ -34,6 +34,9 @@ TICKET_CONFIG = {
     "enabled": True,
     "categories": ["Bug", "Soporte", "Sugerencia"],
     "priorities": ["Baja", "Media", "Alta", "Crítica"],
+    # Rol del equipo que ve y gestiona los tickets. Se busca primero por ID
+    # (fiable aunque renombren el rol); el nombre queda solo como respaldo.
+    "staff_role_id": int(os.getenv("STAFF_ROLE_ID", "1471424172138692674") or 0),
     "staff_role_name": "Staff",
     "data_file": os.path.join(DATA_DIR, "tickets.json"),
 }

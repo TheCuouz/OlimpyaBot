@@ -188,10 +188,19 @@ async def archive_channel(channel: discord.TextChannel):
             except Exception:
                 pass
 
-def get_staff_role(guild: discord.Guild, staff_role_name: str) -> Optional[discord.Role]:
-    for role in guild.roles:
-        if role.name.lower() == staff_role_name.lower():
+def get_staff_role(guild: discord.Guild) -> Optional[discord.Role]:
+    """Resuelve el rol de staff: primero por ID (fiable), luego por nombre."""
+    from config import TICKET_CONFIG
+    role_id = TICKET_CONFIG.get("staff_role_id") or 0
+    if role_id:
+        role = guild.get_role(role_id)
+        if role:
             return role
+    name = TICKET_CONFIG.get("staff_role_name")
+    if name:
+        for role in guild.roles:
+            if role.name.lower() == name.lower():
+                return role
     return None
 
 def user_is_staff(member: discord.Member, staff_role: Optional[discord.Role]) -> bool:

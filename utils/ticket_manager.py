@@ -122,6 +122,17 @@ class TicketManager:
             self._save_data()
             logger.info(f"Assigned ticket {ticket_id} to {staff_name}")
     
+    def delete_ticket(self, ticket_id: str) -> bool:
+        before = len(self.data["tickets"])
+        self.data["tickets"] = [
+            t for t in self.data["tickets"] if t["ticket_id"] != ticket_id
+        ]
+        if len(self.data["tickets"]) != before:
+            self._save_data()
+            logger.info(f"Deleted ticket {ticket_id}")
+            return True
+        return False
+
     def list_tickets(self, status: Optional[str] = None) -> List[Dict]:
         if status:
             return [t for t in self.data["tickets"] if t["status"] == status]
