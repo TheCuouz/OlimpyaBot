@@ -1,16 +1,16 @@
 """Interactive embed builder with button UI."""
+import traceback
+
 import discord
 from discord.ext import commands
 from discord import app_commands
-import logging
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+from utils.logger import logger
 
 
-class TitleModal(discord.ui.Modal):
-    title = "Edit Title"
-    title_input = discord.ui.TextInput(label="Title", max_length=256)
+class TitleModal(discord.ui.Modal, title="Editar título"):
+    title_input = discord.ui.TextInput(label="Título", max_length=256)
 
     def __init__(self, cog, user_id):
         super().__init__()
@@ -23,9 +23,8 @@ class TitleModal(discord.ui.Modal):
         await interaction.response.defer()
 
 
-class DescriptionModal(discord.ui.Modal):
-    title = "Edit Description"
-    desc_input = discord.ui.TextInput(label="Description", max_length=4096, style=discord.TextStyle.long)
+class DescriptionModal(discord.ui.Modal, title="Editar descripción"):
+    desc_input = discord.ui.TextInput(label="Descripción", max_length=4000, style=discord.TextStyle.long)
 
     def __init__(self, cog, user_id):
         super().__init__()
@@ -38,8 +37,7 @@ class DescriptionModal(discord.ui.Modal):
         await interaction.response.defer()
 
 
-class ColorModal(discord.ui.Modal):
-    title = "Select Color"
+class ColorModal(discord.ui.Modal, title="Seleccionar color"):
     color_input = discord.ui.TextInput(label="Color (rojo, azul, verde...)", max_length=50)
 
     def __init__(self, cog, user_id):
@@ -58,23 +56,37 @@ class BuilderView(discord.ui.View):
         super().__init__(timeout=1800)
         self.cog, self.user_id, self.channel = cog, user_id, channel
 
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item) -> None:
+        tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        logger.error(f"BuilderView error en {item}:\n{tb}")
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(f"❌ Error interno: `{error.__class__.__name__}: {error}`", ephemeral=True)
+            else:
+                await interaction.response.send_message(f"❌ Error interno: `{error.__class__.__name__}: {error}`", ephemeral=True)
+        except Exception:
+            pass
+
     @discord.ui.button(label="Título", style=discord.ButtonStyle.gray)
     async def title_btn(self, interaction, button):
         if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Este builder no es tuyo.", ephemeral=True)
             return
-        await interaction.response.show_modal(TitleModal(self.cog, self.user_id))
+        await interaction.response.send_modal(TitleModal(self.cog, self.user_id))
 
     @discord.ui.button(label="Descripción", style=discord.ButtonStyle.gray)
     async def desc_btn(self, interaction, button):
         if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Este builder no es tuyo.", ephemeral=True)
             return
-        await interaction.response.show_modal(DescriptionModal(self.cog, self.user_id))
+        await interaction.response.send_modal(DescriptionModal(self.cog, self.user_id))
 
     @discord.ui.button(label="Color", style=discord.ButtonStyle.gray)
     async def color_btn(self, interaction, button):
         if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Este builder no es tuyo.", ephemeral=True)
             return
-        await interaction.response.show_modal(ColorModal(self.cog, self.user_id))
+        await interaction.response.send_modal(ColorModal(self.cog, self.user_id))
 
     @discord.ui.button(label="Preview", style=discord.ButtonStyle.primary)
     async def preview_btn(self, interaction, button):
@@ -130,11 +142,12 @@ class EmbedBuilderCog(commands.Cog):
             select = discord.ui.ChannelSelect(channel_types=[discord.ChannelType.text])
 
             async def select_cb(sel_int):
-                ch = sel_int.values[0]
-                self.bot.embed_builders[interaction.user.id] = {"channel": ch}
+                picked = sel_int.values[0]
+                real_channel = sel_int.guild.get_channel(picked.id) or await sel_int.guild.fetch_channel(picked.id)
+                self.bot.embed_builders[interaction.user.id] = {"channel": real_channel}
                 await sel_int.response.send_message(
-                    f"🎨 Canal: {ch.mention}\n\nElige un campo:",
-                    view=BuilderView(self, interaction.user.id, ch),
+                    f"🎨 Canal: {real_channel.mention}\n\nElige un campo:",
+                    view=BuilderView(self, interaction.user.id, real_channel),
                     ephemeral=True
                 )
 
