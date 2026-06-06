@@ -6,13 +6,28 @@ from cogs.admin import AdminCog
 
 
 @pytest.mark.asyncio
-async def test_purge_requires_admin():
+async def test_purge_rejects_out_of_range():
+    # El control de admin es declarativo (@app_commands.default_permissions),
+    # lo aplica Discord server-side. La invariante propia del código es el rango 1-100.
     bot = MagicMock()
     cog = AdminCog(bot)
     interaction = AsyncMock()
-    interaction.user.guild_permissions.administrator = False
-    await cog.purge.callback(cog, interaction, 5)
+    await cog.purge.callback(cog, interaction, 0)
     interaction.response.send_message.assert_called()
+    # Con 0 mensajes no debe llegar a purgar el canal.
+    interaction.channel.purge.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_purge_valid_range_executes():
+    bot = MagicMock()
+    cog = AdminCog(bot)
+    interaction = AsyncMock()
+    interaction.response.defer = AsyncMock()
+    interaction.channel.purge = AsyncMock(return_value=[1, 2, 3])
+    await cog.purge.callback(cog, interaction, 3)
+    interaction.response.defer.assert_called_once()
+    interaction.channel.purge.assert_called_once_with(limit=3)
 
 
 @pytest.mark.asyncio
@@ -37,7 +52,8 @@ async def test_kick_success():
     interaction.guild = AsyncMock()
     interaction.guild.kick = AsyncMock()
     await cog.kick.callback(cog, interaction, user)
-    interaction.guild.kick.assert_called_once_with(user)
+    # El código pasa un reason (por defecto "Sin motivo") a la API de Discord.
+    interaction.guild.kick.assert_called_once_with(user, reason="Sin motivo")
     interaction.response.send_message.assert_called()
 
 
@@ -63,7 +79,7 @@ async def test_ban_success():
     interaction.guild = AsyncMock()
     interaction.guild.ban = AsyncMock()
     await cog.ban.callback(cog, interaction, user)
-    interaction.guild.ban.assert_called_once_with(user)
+    interaction.guild.ban.assert_called_once_with(user, reason="Sin motivo")
     interaction.response.send_message.assert_called()
 
 
@@ -90,8 +106,8 @@ async def test_softban_success():
     interaction.guild.ban = AsyncMock()
     interaction.guild.unban = AsyncMock()
     await cog.softban.callback(cog, interaction, user)
-    interaction.guild.ban.assert_called_once_with(user, delete_message_days=7)
-    interaction.guild.unban.assert_called_once_with(user)
+    interaction.guild.ban.assert_called_once_with(user, delete_message_days=7, reason="Sin motivo")
+    interaction.guild.unban.assert_called_once_with(user, reason="Softban")
     interaction.response.send_message.assert_called()
 
 
@@ -122,17 +138,14 @@ async def test_mute_success():
     bot = MagicMock()
     cog = AdminCog(bot)
     interaction = AsyncMock()
-    user = MagicMock()
+    # El código aplica el timeout directamente sobre el Member recibido (no hace fetch).
+    user = AsyncMock()
     user.id = 123
     user.mention = "@TestUser"
-    member = AsyncMock()
-    member.timeout = AsyncMock()
+    user.timeout = AsyncMock()
     interaction.user.guild_permissions.administrator = True
-    interaction.guild = AsyncMock()
-    interaction.guild.fetch_member = AsyncMock(return_value=member)
     await cog.mute.callback(cog, interaction, user, "1h")
-    interaction.guild.fetch_member.assert_called_once_with(user.id)
-    member.timeout.assert_called_once()
+    user.timeout.assert_called_once()
     interaction.response.send_message.assert_called()
 
 
@@ -160,13 +173,15 @@ async def test_warn_success():
 
 
 @pytest.mark.asyncio
-async def test_clear_requires_admin():
+async def test_clear_rejects_unknown_type():
+    # El control de admin es declarativo (lo aplica Discord). La invariante propia
+    # del código es la allowlist de tipos: un tipo fuera de ella se rechaza sin defer.
     bot = MagicMock()
     cog = AdminCog(bot)
     interaction = AsyncMock()
-    interaction.user.guild_permissions.administrator = False
-    await cog.clear.callback(cog, interaction, "embeds")
+    await cog.clear.callback(cog, interaction, "no-existe")
     interaction.response.send_message.assert_called()
+    interaction.response.defer.assert_not_called()
 
 
 @pytest.mark.asyncio
