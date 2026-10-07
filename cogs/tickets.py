@@ -13,18 +13,18 @@ from utils.ticket_utils import (
 from config import TICKET_CONFIG
 
 
-class TicketModal(discord.ui.Modal, title="Crear ticket de soporte"):
+class TicketModal(discord.ui.Modal, title="Open a support ticket"):
     motivo = discord.ui.TextInput(
-        label="Motivo",
-        placeholder="Resumen breve del ticket",
+        label="Subject",
+        placeholder="Plugin and a short summary",
         style=discord.TextStyle.short,
         required=True,
         min_length=3,
         max_length=100,
     )
     descripcion = discord.ui.TextInput(
-        label="Descripción",
-        placeholder="Describe tu problema en detalle",
+        label="Description",
+        placeholder="What you did, what happened, server software and version",
         style=discord.TextStyle.paragraph,
         required=True,
         min_length=10,
@@ -57,11 +57,12 @@ class TicketModal(discord.ui.Modal, title="Crear ticket de soporte"):
                 self.motivo.value,
                 interaction.user,
                 staff_role,
+                category=interaction.channel.category if interaction.channel else None,
             )
 
             if not channel:
                 await interaction.followup.send(
-                    "❌ No se pudo crear el canal del ticket. Inténtalo de nuevo.",
+                    "❌ The ticket channel could not be created. Please try again.",
                     ephemeral=True,
                 )
                 return
@@ -80,7 +81,7 @@ class TicketModal(discord.ui.Modal, title="Crear ticket de soporte"):
                 allowed_mentions=discord.AllowedMentions(users=True, roles=True),
             )
             await interaction.followup.send(
-                f"✅ Ticket creado. Canal: {channel.mention}",
+                f"✅ Ticket opened: {channel.mention}",
                 ephemeral=True,
             )
             logger.info(f"Ticket {ticket_id} creado por {interaction.user.name}")
@@ -88,7 +89,7 @@ class TicketModal(discord.ui.Modal, title="Crear ticket de soporte"):
         except Exception as e:
             logger.error(f"Error al crear ticket: {e}", exc_info=True)
             await interaction.followup.send(
-                "❌ Ocurrió un error al crear el ticket. Inténtalo de nuevo.",
+                "❌ Something went wrong opening the ticket. Please try again.",
                 ephemeral=True,
             )
 
@@ -105,33 +106,33 @@ class TicketButtonView(discord.ui.View):
     async def _resolve_ticket_id(self, interaction: discord.Interaction) -> Optional[str]:
         cog = _get_tickets_cog(interaction)
         if not cog:
-            await interaction.response.send_message("❌ Sistema de tickets no disponible.", ephemeral=True)
+            await interaction.response.send_message("❌ Tickets are not available right now.", ephemeral=True)
             return None
         ticket = cog.ticket_manager.get_ticket_by_channel(interaction.channel.id)
         if not ticket:
-            await interaction.response.send_message("❌ Este canal no es un ticket válido.", ephemeral=True)
+            await interaction.response.send_message("❌ This channel is not a ticket.", ephemeral=True)
             return None
         return ticket["ticket_id"]
 
-    @discord.ui.button(label="Cerrar", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="olimpya:ticket:close")
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="olimpya:ticket:close")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket_id = await self._resolve_ticket_id(interaction)
         if ticket_id:
             await _get_tickets_cog(interaction).close_ticket(interaction, ticket_id)
 
-    @discord.ui.button(label="Reabrir", style=discord.ButtonStyle.primary, emoji="🔓", custom_id="olimpya:ticket:reopen")
+    @discord.ui.button(label="Reopen", style=discord.ButtonStyle.primary, emoji="🔓", custom_id="olimpya:ticket:reopen")
     async def reopen_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket_id = await self._resolve_ticket_id(interaction)
         if ticket_id:
             await _get_tickets_cog(interaction).reopen_ticket(interaction, ticket_id)
 
-    @discord.ui.button(label="Asignar", style=discord.ButtonStyle.success, emoji="👤", custom_id="olimpya:ticket:assign")
+    @discord.ui.button(label="Claim", style=discord.ButtonStyle.success, emoji="👤", custom_id="olimpya:ticket:assign")
     async def assign_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket_id = await self._resolve_ticket_id(interaction)
         if ticket_id:
             await _get_tickets_cog(interaction).assign_ticket(interaction, ticket_id)
 
-    @discord.ui.button(label="Eliminar", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="olimpya:ticket:delete")
+    @discord.ui.button(label="Delete", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="olimpya:ticket:delete")
     async def delete_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket_id = await self._resolve_ticket_id(interaction)
         if ticket_id:
@@ -160,10 +161,10 @@ class ConfirmDeleteView(discord.ui.View):
         self.cog = cog
         self.ticket_id = ticket_id
 
-    @discord.ui.button(label="Sí, eliminar", style=discord.ButtonStyle.danger, emoji="🗑️")
+    @discord.ui.button(label="Yes, delete", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket = self.cog.ticket_manager.get_ticket(self.ticket_id)
-        await interaction.response.edit_message(content="🗑️ Eliminando el ticket…", view=None)
+        await interaction.response.edit_message(content="🗑️ Deleting the ticket…", view=None)
         self.cog.ticket_manager.delete_ticket(self.ticket_id)
         if ticket and ticket.get("channel_id"):
             channel = interaction.guild.get_channel(ticket["channel_id"])
@@ -176,9 +177,9 @@ class ConfirmDeleteView(discord.ui.View):
                     logger.error(f"No se pudo borrar el canal del ticket {self.ticket_id}: {e}")
         logger.info(f"Ticket {self.ticket_id} eliminado por {interaction.user.name}")
 
-    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="Operación cancelada.", view=None)
+        await interaction.response.edit_message(content="Cancelled.", view=None)
 
 
 class TicketSetupView(discord.ui.View):
@@ -189,7 +190,7 @@ class TicketSetupView(discord.ui.View):
 
         cat_options = [discord.SelectOption(label=c, value=c) for c in TICKET_CONFIG["categories"]]
         self.cat_select = discord.ui.Select(
-            placeholder="Elige una categoría...",
+            placeholder="Pick a category...",
             options=cat_options,
             row=0,
             min_values=1,
@@ -200,7 +201,7 @@ class TicketSetupView(discord.ui.View):
 
         pri_options = [discord.SelectOption(label=p, value=p) for p in TICKET_CONFIG["priorities"]]
         self.pri_select = discord.ui.Select(
-            placeholder="Elige una prioridad...",
+            placeholder="Pick a priority...",
             options=pri_options,
             row=1,
             min_values=1,
@@ -210,7 +211,7 @@ class TicketSetupView(discord.ui.View):
         self.add_item(self.pri_select)
 
         self.continue_btn = discord.ui.Button(
-            label="Continuar",
+            label="Continue",
             style=discord.ButtonStyle.success,
             emoji="➡️",
             disabled=True,
@@ -241,10 +242,10 @@ class TicketSetupView(discord.ui.View):
     async def _on_continue(self, interaction: discord.Interaction):
         cog = _get_tickets_cog(interaction)
         if not cog:
-            await interaction.response.send_message("❌ Sistema de tickets no disponible.", ephemeral=True)
+            await interaction.response.send_message("❌ Tickets are not available right now.", ephemeral=True)
             return
         if not (self.categoria and self.prioridad):
-            await interaction.response.send_message("❌ Selecciona categoría y prioridad primero.", ephemeral=True)
+            await interaction.response.send_message("❌ Pick a category and a priority first.", ephemeral=True)
             return
         await interaction.response.send_modal(TicketModal(cog, self.categoria, self.prioridad))
 
@@ -253,10 +254,10 @@ class CreateTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Crear Ticket", style=discord.ButtonStyle.primary, emoji="📝", custom_id="olimpya:ticket:create")
+    @discord.ui.button(label="Open ticket", style=discord.ButtonStyle.primary, emoji="📝", custom_id="olimpya:ticket:create")
     async def create_ticket_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
-            "**Configura tu ticket**\nElige categoría y prioridad y pulsa Continuar para rellenar el motivo.",
+            "**Your ticket**\nPick a category and a priority, then press Continue to describe it.",
             view=TicketSetupView(),
             ephemeral=True,
         )
@@ -280,7 +281,7 @@ class Tickets(commands.Cog):
     async def on_ready(self):
         logger.info("Tickets cog ready")
 
-    @app_commands.command(name="setup-tickets", description="Configura el sistema de tickets en este canal")
+    @app_commands.command(name="setup-tickets", description="Post the support ticket panel in this channel")
     @app_commands.default_permissions(administrator=True)
     async def setup_tickets(self, interaction: discord.Interaction):
         try:
@@ -291,7 +292,7 @@ class Tickets(commands.Cog):
         except Exception as e:
             logger.error(f"Error al configurar tickets: {e}")
             await interaction.response.send_message(
-                "❌ No se pudo configurar el sistema de tickets.",
+                "❌ Could not post the ticket panel.",
                 ephemeral=True
             )
 
@@ -316,11 +317,11 @@ class Tickets(commands.Cog):
         try:
             ticket = self.ticket_manager.get_ticket(ticket_id)
             if not ticket:
-                await interaction.followup.send("❌ Ticket no encontrado.", ephemeral=True)
+                await interaction.followup.send("❌ Ticket not found.", ephemeral=True)
                 return
 
             if ticket["status"] == "closed":
-                await interaction.followup.send("ℹ️ Este ticket ya está cerrado.", ephemeral=True)
+                await interaction.followup.send("ℹ️ This ticket is already closed.", ephemeral=True)
                 return
 
             staff_role = get_staff_role(interaction.guild)
@@ -328,7 +329,7 @@ class Tickets(commands.Cog):
             is_staff = user_is_staff(interaction.user, staff_role)
 
             if not (is_creator or is_staff):
-                await interaction.followup.send("❌ No tienes permiso para cerrar este ticket.", ephemeral=True)
+                await interaction.followup.send("❌ Only the person who opened it or the team can close this ticket.", ephemeral=True)
                 return
 
             self.ticket_manager.close_ticket(ticket_id)
@@ -337,24 +338,24 @@ class Tickets(commands.Cog):
                 await archive_channel(channel)
 
             await self._refresh_ticket_message(interaction, ticket_id)
-            action_embed = create_action_embed("Cerrado", interaction.user.name)
+            action_embed = create_action_embed("Closed", interaction.user.name)
             await interaction.followup.send(embed=action_embed, ephemeral=True)
             logger.info(f"Ticket {ticket_id} cerrado por {interaction.user.name}")
 
         except Exception as e:
             logger.error(f"Error al cerrar ticket {ticket_id}: {e}")
-            await interaction.followup.send("❌ Error al cerrar el ticket.", ephemeral=True)
+            await interaction.followup.send("❌ Could not close the ticket.", ephemeral=True)
 
     async def reopen_ticket(self, interaction: discord.Interaction, ticket_id: str):
         await interaction.response.defer(ephemeral=True)
         try:
             ticket = self.ticket_manager.get_ticket(ticket_id)
             if not ticket:
-                await interaction.followup.send("❌ Ticket no encontrado.", ephemeral=True)
+                await interaction.followup.send("❌ Ticket not found.", ephemeral=True)
                 return
 
             if ticket["status"] != "closed":
-                await interaction.followup.send("ℹ️ Este ticket no está cerrado.", ephemeral=True)
+                await interaction.followup.send("ℹ️ This ticket is not closed.", ephemeral=True)
                 return
 
             staff_role = get_staff_role(interaction.guild)
@@ -362,7 +363,7 @@ class Tickets(commands.Cog):
             is_staff = user_is_staff(interaction.user, staff_role)
 
             if not (is_creator or is_staff):
-                await interaction.followup.send("❌ No tienes permiso para reabrir este ticket.", ephemeral=True)
+                await interaction.followup.send("❌ Only the person who opened it or the team can reopen this ticket.", ephemeral=True)
                 return
 
             self.ticket_manager.reopen_ticket(ticket_id)
@@ -384,53 +385,53 @@ class Tickets(commands.Cog):
                         pass
 
             await self._refresh_ticket_message(interaction, ticket_id)
-            action_embed = create_action_embed("Reabierto", interaction.user.name)
+            action_embed = create_action_embed("Reopened", interaction.user.name)
             await interaction.followup.send(embed=action_embed, ephemeral=True)
             logger.info(f"Ticket {ticket_id} reabierto por {interaction.user.name}")
 
         except Exception as e:
             logger.error(f"Error al reabrir ticket {ticket_id}: {e}")
-            await interaction.followup.send("❌ Error al reabrir el ticket.", ephemeral=True)
+            await interaction.followup.send("❌ Could not reopen the ticket.", ephemeral=True)
 
     async def assign_ticket(self, interaction: discord.Interaction, ticket_id: str):
         await interaction.response.defer(ephemeral=True)
         try:
             ticket = self.ticket_manager.get_ticket(ticket_id)
             if not ticket:
-                await interaction.followup.send("❌ Ticket no encontrado.", ephemeral=True)
+                await interaction.followup.send("❌ Ticket not found.", ephemeral=True)
                 return
 
             staff_role = get_staff_role(interaction.guild)
             if not user_is_staff(interaction.user, staff_role):
-                await interaction.followup.send("❌ Necesitas ser staff para asignar tickets.", ephemeral=True)
+                await interaction.followup.send("❌ Only the team can claim tickets.", ephemeral=True)
                 return
 
             self.ticket_manager.assign_ticket(ticket_id, interaction.user.id, interaction.user.name)
             await self._refresh_ticket_message(interaction, ticket_id)
-            action_embed = create_action_embed(f"Asignado a {interaction.user.name}", interaction.user.name)
+            action_embed = create_action_embed(f"Claimed by {interaction.user.name}", interaction.user.name)
             await interaction.followup.send(embed=action_embed, ephemeral=True)
             logger.info(f"Ticket {ticket_id} asignado a {interaction.user.name}")
 
         except Exception as e:
             logger.error(f"Error al asignar ticket {ticket_id}: {e}")
-            await interaction.followup.send("❌ Error al asignar el ticket.", ephemeral=True)
+            await interaction.followup.send("❌ Could not claim the ticket.", ephemeral=True)
 
     async def delete_ticket(self, interaction: discord.Interaction, ticket_id: str):
         ticket = self.ticket_manager.get_ticket(ticket_id)
         if not ticket:
-            await interaction.response.send_message("❌ Ticket no encontrado.", ephemeral=True)
+            await interaction.response.send_message("❌ Ticket not found.", ephemeral=True)
             return
 
         staff_role = get_staff_role(interaction.guild)
         if not user_is_staff(interaction.user, staff_role):
             await interaction.response.send_message(
-                "❌ Solo el staff puede eliminar tickets.", ephemeral=True
+                "❌ Only the team can delete tickets.", ephemeral=True
             )
             return
 
         await interaction.response.send_message(
-            f"⚠️ ¿Seguro que quieres **eliminar** el ticket **#{ticket_id}**?\n"
-            "Se borrará el canal por completo y **no se puede deshacer**.",
+            f"⚠️ **Delete** ticket **#{ticket_id}**?\n"
+            "The channel is removed for good and **this cannot be undone**.",
             view=ConfirmDeleteView(self, ticket_id),
             ephemeral=True,
         )

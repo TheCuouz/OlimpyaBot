@@ -4,29 +4,29 @@ from typing import Optional
 
 
 PRIORITY_COLORS = {
-    "Baja": 0x57F287,      # verde
-    "Media": 0x5865F2,     # blurple
-    "Alta": 0xFEE75C,      # amarillo
-    "Crítica": 0xED4245,   # rojo
+    "Low": 0x57F287,
+    "Normal": 0x5865F2,
+    "High": 0xFEE75C,
+    "Urgent": 0xED4245,
 }
 
 PRIORITY_EMOJI = {
-    "Baja": "🟢",
-    "Media": "🔵",
-    "Alta": "🟠",
-    "Crítica": "🔴",
+    "Low": "🟢",
+    "Normal": "🔵",
+    "High": "🟠",
+    "Urgent": "🔴",
 }
 
 CATEGORY_EMOJI = {
     "Bug": "🐞",
-    "Soporte": "💬",
-    "Sugerencia": "💡",
+    "Help": "💬",
+    "Licence": "🔑",
 }
 
 STATUS_BADGE = {
-    "open": ("🟢", "Abierto", 0x57F287),
-    "closed": ("⚫", "Cerrado", 0x747F8D),
-    "reopened": ("🟡", "Reabierto", 0xFEE75C),
+    "open": ("🟢", "Open", 0x57F287),
+    "closed": ("⚫", "Closed", 0x747F8D),
+    "reopened": ("🟡", "Reopened", 0xFEE75C),
 }
 
 
@@ -54,72 +54,73 @@ def create_ticket_embed(ticket: dict) -> discord.Embed:
         color=color,
     )
 
-    embed.add_field(name="👤 Creado por", value=f"<@{ticket['creator_id']}>", inline=True)
-    embed.add_field(name=f"{cat_emoji} Categoría", value=f"`{ticket['category']}`", inline=True)
-    embed.add_field(name=f"{pri_emoji} Prioridad", value=f"`{priority}`", inline=True)
+    embed.add_field(name="👤 Opened by", value=f"<@{ticket['creator_id']}>", inline=True)
+    embed.add_field(name=f"{cat_emoji} Category", value=f"`{ticket['category']}`", inline=True)
+    embed.add_field(name=f"{pri_emoji} Priority", value=f"`{priority}`", inline=True)
 
-    embed.add_field(name=f"{status_emoji} Estado", value=f"`{status_label}`", inline=True)
+    embed.add_field(name=f"{status_emoji} Status", value=f"`{status_label}`", inline=True)
     asignado = (
         f"<@{ticket['assigned_to']}>"
         if ticket.get("assigned_to")
-        else "*Sin asignar*"
+        else "*Unassigned*"
     )
-    embed.add_field(name="🛠️ Asignado a", value=asignado, inline=True)
+    embed.add_field(name="🛠️ Assigned to", value=asignado, inline=True)
 
     if ticket.get("notes"):
-        embed.add_field(name="📝 Notas", value=f"{len(ticket['notes'])}", inline=True)
+        embed.add_field(name="📝 Notes", value=f"{len(ticket['notes'])}", inline=True)
     else:
         embed.add_field(name="​", value="​", inline=True)
 
     created_dt = datetime.fromisoformat(ticket["created_at"]).replace(tzinfo=timezone.utc)
     embed.timestamp = created_dt
-    embed.set_footer(text=f"ID {ticket['ticket_id']} • Creado")
+    embed.set_footer(text=f"ID {ticket['ticket_id']} • Opened")
     return embed
 
 
 def create_setup_embed() -> discord.Embed:
     embed = discord.Embed(
-        title="🎫  Sistema de Tickets",
+        title="🎫  Private support",
         description=(
-            "¿Necesitas ayuda? Abre un ticket privado con el equipo.\n"
-            "Solo tú y el staff podréis ver la conversación.\n"
+            "Need help with a plugin you bought? Open a private ticket: only you and the team "
+            "can see it.\n"
+            "¿Necesitas ayuda con un plugin que compraste? Abre un ticket privado: solo tú y el "
+            "equipo lo veréis.\n"
             f"{_divider()}"
         ),
         color=0x5865F2,
     )
     embed.add_field(
-        name="📋  ¿Qué puedes reportar?",
+        name="📋  What it's for",
         value=(
-            "🐞 **Bug** — algo no funciona como debería\n"
-            "💬 **Soporte** — necesitas ayuda con algo\n"
-            "💡 **Sugerencia** — propones una mejora"
+            "🐞 **Bug** — something doesn't work as it should\n"
+            "💬 **Help** — setup, configuration, how do I...\n"
+            "🔑 **Licence** — keys, transfers, extra servers, invoices"
         ),
         inline=False,
     )
     embed.add_field(
-        name="⚡  Prioridades",
+        name="🐞  For a bug, include",
         value=(
-            "🟢 `Baja`  ·  🔵 `Media`  ·  🟠 `Alta`  ·  🔴 `Crítica`"
+            "Plugin and version · server software and Minecraft version · what you did · "
+            "what happened · the full console error"
         ),
         inline=False,
     )
     embed.add_field(
-        name="🚀  Cómo abrir uno",
+        name="🚀  How",
         value=(
-            "**1.** Pulsa el botón **Crear Ticket** de abajo\n"
-            "**2.** Elige categoría y prioridad\n"
-            "**3.** Rellena motivo y descripción\n"
-            "**4.** Se creará un canal privado para tu caso"
+            "Press **Open ticket**, pick a category and a priority, and describe the problem. "
+            "A private channel is created for your case."
         ),
         inline=False,
     )
-    embed.set_footer(text="OlimpyaBot · Sistema de Tickets")
+    embed.set_footer(text="TTS Dev SL · Support")
     return embed
 
 
 def create_action_embed(action: str, performed_by: str) -> discord.Embed:
     embed = discord.Embed(
-        description=f"✅  **{action}** por **{performed_by}**",
+        description=f"✅  **{action}** by **{performed_by}**",
         color=0x57F287,
     )
     embed.timestamp = datetime.now(timezone.utc)
@@ -130,18 +131,18 @@ def create_welcome_message(user: discord.Member, ticket: dict, staff_role: Optio
     cat_emoji = CATEGORY_EMOJI.get(ticket["category"], "📁")
     pri_emoji = PRIORITY_EMOJI.get(ticket["priority"], "⚪")
     parts = [
-        f"👋  ¡Hola {user.mention}!",
+        f"👋  Hi {user.mention}!",
         "",
-        f"Tu ticket **#{ticket['ticket_id']}** ha sido creado correctamente.",
+        f"Your ticket **#{ticket['ticket_id']}** is open.",
         f"{cat_emoji} `{ticket['category']}`  ·  {pri_emoji} `{ticket['priority']}`",
         "",
-        "Describe cualquier detalle adicional aquí. ",
+        "Add any detail, screenshot or log here. ",
     ]
     if staff_role:
-        parts[-1] += f"El equipo {staff_role.mention} ha sido notificado."
+        parts[-1] += f"{staff_role.mention} has been notified."
     else:
-        parts[-1] += "El equipo de staff responderá lo antes posible."
-    parts.append("Cuando esté resuelto, pulsa **🔒 Cerrar**.")
+        parts[-1] += "The team will answer as soon as possible."
+    parts.append("When it's solved, press **🔒 Close**.")
     return "\n".join(parts)
 
 def get_channel_name(ticket_id: str, title: str) -> str:
@@ -151,7 +152,8 @@ def get_channel_name(ticket_id: str, title: str) -> str:
 
 async def create_ticket_channel(guild: discord.Guild, ticket_id: str,
                                title: str, creator: discord.Member,
-                               staff_role: Optional[discord.Role] = None) -> Optional[discord.TextChannel]:
+                               staff_role: Optional[discord.Role] = None,
+                               category: Optional[discord.CategoryChannel] = None) -> Optional[discord.TextChannel]:
     channel_name = get_channel_name(ticket_id, title)
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(read_messages=False),
@@ -163,7 +165,8 @@ async def create_ticket_channel(guild: discord.Guild, ticket_id: str,
         channel = await guild.create_text_channel(
             channel_name,
             overwrites=overwrites,
-            topic=f"Ticket {ticket_id} — Creado por {creator.name}"
+            category=category,
+            topic=f"Ticket {ticket_id} — opened by {creator.name}"
         )
         return channel
     except Exception:
