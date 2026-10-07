@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 import os
 import traceback
-from config import DISCORD_TOKEN
+from config import DISCORD_TOKEN, GUILD_ID
 from utils.logger import logger
 
 
@@ -20,6 +20,12 @@ class OlimpyaBot(commands.Bot):
 
     async def setup_hook(self):
         await self.load_cogs()
+        if GUILD_ID:
+            # Guild commands show up at once; global ones can take a while and would duplicate them.
+            guild = discord.Object(id=GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+            self.tree.clear_commands(guild=None)
         await self.tree.sync()
         logger.info("Cogs cargados y slash commands sincronizados")
 
