@@ -11,36 +11,58 @@ from utils.vouches import RATING_LABELS, VouchStore, all_plugins, stars, vouch_e
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 IMAGE_TYPES = ("image/png", "image/jpeg", "image/gif", "image/webp")
+CONFIRMATION_SECONDS = 20
 
 
-class VouchModal(discord.ui.Modal):
-    review = discord.ui.TextInput(
-        label="Your review",
-        style=discord.TextStyle.paragraph,
-        placeholder="What you use it for, what you liked, what could be better",
-        min_length=20,
-        max_length=1000,
+class VouchModal(discord.ui.Modal, title="Leave a vouch"):
+    """Everything in one window: plugin, stars, review, server and an optional image."""
+
+    plugin = discord.ui.Label(
+        text="Plugin",
+        description="Which one are you reviewing?",
+        component=discord.ui.Select(
+            placeholder="Choose a plugin",
+            options=[discord.SelectOption(label=p, value=p) for p in all_plugins()],
+        ),
     )
-    server = discord.ui.TextInput(
-        label="Your server (optional)",
-        style=discord.TextStyle.short,
-        placeholder="Name or IP, if you want it shown",
-        required=False,
-        max_length=60,
+    rating = discord.ui.Label(
+        text="Rating",
+        component=discord.ui.Select(
+            placeholder="How many stars?",
+            options=[discord.SelectOption(label=f"{stars(n)}  {RATING_LABELS[n]}", value=str(n))
+                     for n in range(5, 0, -1)],
+        ),
+    )
+    review = discord.ui.Label(
+        text="Your review",
+        component=discord.ui.TextInput(
+            style=discord.TextStyle.paragraph,
+            placeholder="What you use it for, what you liked, what could be better",
+            min_length=20,
+            max_length=1000,
+        ),
+    )
+    server = discord.ui.Label(
+        text="Your server",
+        description="Optional: a name or IP if you want it on the card",
+        component=discord.ui.TextInput(style=discord.TextStyle.short, required=False, max_length=60),
+    )
+    image = discord.ui.Label(
+        text="Image",
+        description="Optional: show something you built with it (PNG, JPG, GIF or WEBP, up to 8 MB)",
+        component=discord.ui.FileUpload(required=False, max_values=1),
     )
 
-    def __init__(self, cog: "Vouches", plugin: str, rating: int, previous: dict = None,
-                 image: Optional[discord.Attachment] = None):
-        super().__init__(title=f"Review {plugin}"[:45])
+    def __init__(self, cog: "Vouches"):
+        super().__init__()
         self.cog = cog
-        self.plugin = plugin
-        self.rating = rating
-        self.previous = previous
-        self.image = image
 
     async def on_submit(self, interaction: discord.Interaction):
-        await self.cog.publish(interaction, self.plugin, self.rating, self.review.value,
-                               self.server.value.strip() or None, self.previous, self.image)
+        plugin = self.plugin.component.values[0]
+        rating = int(self.rating.component.values[0])
+        files = self.image.component.values
+        await self.cog.publish(interaction, plugin, rating, self.review.component.value,
+                               self.server.component.value.strip() or None, files[0] if files else None)
 
 
 class Vouches(commands.Cog):
@@ -51,41 +73,36 @@ class Vouches(commands.Cog):
         self.store = VouchStore(VOUCHES_FILE)
 
     @app_commands.command(name="vouch", description="Review one of our plugins")
-    @app_commands.describe(plugin="The plugin you're reviewing", rating="How many stars",
-                           image="Optional: a screenshot of what you built with it")
-    @app_commands.choices(rating=[
-        app_commands.Choice(name=f"{stars(n)}  {RATING_LABELS[n]}", value=n) for n in range(5, 0, -1)])
-    async def vouch(self, interaction: discord.Interaction, plugin: str, rating: app_commands.Choice[int],
-                    image: Optional[discord.Attachment] = None):
-        if plugin not in all_plugins():
-            await interaction.response.send_message("❌ Pick a plugin from the list.", ephemeral=True)
+    @app_commands.guild_only()
+    async def vouch(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(VouchModal(self))
+
+    async def _reply(self, interaction: discord.Interaction, text: str):
+        """Only the author sees it, and it goes away so the channel stays clean."""
+        message = await interaction.followup.send(text, ephemeral=True, wait=True)
+        try:
+            await message.delete(delay=CONFIRMATION_SECONDS)
+        except discord.HTTPException:
+            pass
+
+    async def publish(self, interaction: discord.Interaction, plugin: str, rating: int,
+                      review: str, server: Optional[str], image: Optional[discord.Attachment]):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        channel = interaction.guild.get_channel(VOUCH_CHANNEL_ID) if interaction.guild else None
+        if channel is None:
+            await self._reply(interaction, "❌ The vouches channel isn't set up.")
             return
         if image is not None:
             kind = (image.content_type or "").split(";")[0]
             if kind not in IMAGE_TYPES:
-                await interaction.response.send_message(
-                    "❌ The image must be a PNG, JPG, GIF or WEBP.", ephemeral=True)
+                await self._reply(interaction, "❌ The image must be a PNG, JPG, GIF or WEBP. Nothing was posted.")
                 return
             if image.size > MAX_IMAGE_BYTES:
-                await interaction.response.send_message("❌ The image must be under 8 MB.", ephemeral=True)
+                await self._reply(interaction, "❌ The image must be under 8 MB. Nothing was posted.")
                 return
-        previous = self.store.get(interaction.user.id, plugin)
-        await interaction.response.send_modal(VouchModal(self, plugin, rating.value, previous, image))
-
-    @vouch.autocomplete("plugin")
-    async def plugin_autocomplete(self, interaction: discord.Interaction, current: str):
-        c = current.lower()
-        return [app_commands.Choice(name=n, value=n) for n in all_plugins() if c in n.lower()][:25]
-
-    async def publish(self, interaction: discord.Interaction, plugin: str, rating: int,
-                      review: str, server, previous, image: Optional[discord.Attachment] = None):
-        await interaction.response.defer(ephemeral=True)
-        channel = interaction.guild.get_channel(VOUCH_CHANNEL_ID) if interaction.guild else None
-        if channel is None:
-            await interaction.followup.send("❌ The vouches channel isn't set up.", ephemeral=True)
-            return
 
         member = interaction.user
+        previous = self.store.get(member.id, plugin)
         verified = any(r.name == CUSTOMER_ROLE for r in getattr(member, "roles", []))
         number = previous["number"] if previous else self.store.next_number()
         icon = interaction.guild.icon.url if interaction.guild.icon else None
@@ -115,7 +132,7 @@ class Vouches(commands.Cog):
                 message = None
         if message is None:
             if file:
-                file.fp.seek(0)
+                file.reset()
                 message = await channel.send(embed=embed, file=file)
             else:
                 message = await channel.send(embed=embed)
@@ -125,11 +142,11 @@ class Vouches(commands.Cog):
                 pass
         self.store.save(member.id, plugin, rating, message.id, number)
 
-        await interaction.followup.send(
+        await self._reply(
+            interaction,
             ("✏️ Your review is updated: " if previous else "⭐ Thank you! Your review is up: ")
             + message.jump_url
-            + "\nGot it on BuiltByBit or SpigotMC? A review there helps us a lot too.",
-            ephemeral=True)
+            + "\nGot it on BuiltByBit or SpigotMC? A review there helps us a lot too.")
         logger.info(f"/vouch: {member} -> {plugin} {rating}★ ({'updated' if previous else 'new'})")
 
 
