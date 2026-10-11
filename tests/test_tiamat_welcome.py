@@ -118,3 +118,50 @@ class TestRouting(unittest.IsolatedAsyncioTestCase):
         await c.on_member_join(self.member(123))
         c._log.assert_not_awaited()
         c.tiamat.join.assert_not_awaited()
+
+
+class TestFlush(unittest.IsolatedAsyncioTestCase):
+    def welcomer(self, d):
+        from utils import tiamat_welcome as tw
+        bot = MagicMock()
+        channel = MagicMock()
+        channel.send = AsyncMock(return_value=MagicMock(id=777))
+        bot.get_channel.return_value = channel
+        w = tw.TiamatWelcomer(bot, d)
+        return tw, w, channel
+
+    def member(self, uid):
+        m = MagicMock(bot=False, id=uid)
+        m.guild.member_count = 40
+        return m
+
+    async def test_single_join_gets_a_card(self):
+        with tempfile.TemporaryDirectory() as d:
+            tw, w, channel = self.welcomer(d)
+            orig, tw.BURST_WINDOW = tw.BURST_WINDOW, 0
+            tw.send_card = AsyncMock(return_value=MagicMock(id=555))
+            try:
+                await w.join(self.member(1))
+                await w.flusher
+            finally:
+                tw.BURST_WINDOW = orig
+            tw.send_card.assert_awaited_once()
+            self.assertEqual(tw.send_card.await_args.args[2], 40)
+            self.assertTrue(w.store.recently_welcomed(1))
+            await w.join(self.member(1))          # rejoin: nothing queued
+            self.assertEqual(w.pending, [])
+
+    async def test_wave_becomes_one_message(self):
+        with tempfile.TemporaryDirectory() as d:
+            tw, w, channel = self.welcomer(d)
+            orig, tw.BURST_WINDOW = tw.BURST_WINDOW, 0.05
+            tw.send_card = AsyncMock()
+            try:
+                for i in range(6):
+                    await w.join(self.member(100 + i))
+                await w.flusher
+            finally:
+                tw.BURST_WINDOW = orig
+            tw.send_card.assert_not_awaited()
+            channel.send.assert_awaited_once()
+            self.assertIn("<@100>", channel.send.await_args.kwargs["content"])

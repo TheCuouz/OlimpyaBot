@@ -108,14 +108,14 @@ class WelcomeStore:
         self._save()
 
 
-async def render(member):
+async def render(member, number):
     try:
         raw = await member.display_avatar.replace(format="png", size=512).read()
     except Exception as e:
         logger.warning(f"Tiamat: sin avatar de {member} ({e}); va el dragón")
         raw = None
     name = card_name(member.display_name, member.name)
-    png = await asyncio.to_thread(tiamat_card.card, name, member.guild.member_count or 0, raw)
+    png = await asyncio.to_thread(tiamat_card.card, name, number, raw)
     return discord.File(io.BytesIO(png), filename="bienvenida.png")
 
 
@@ -123,7 +123,7 @@ async def send_card(channel, member, number, test=False):
     content = welcome_text(member.id, number)
     if test:
         content = "🧪 **Prueba de la bienvenida** (sin mención; así lo verá cada persona nueva en #general)\n\n" + content
-    msg = await channel.send(content=content, file=await render(member), view=buttons(),
+    msg = await channel.send(content=content, file=await render(member, number), view=buttons(),
                              allowed_mentions=discord.AllowedMentions.none() if test
                              else discord.AllowedMentions(everyone=False, roles=False, users=[member]))
     try:
@@ -193,14 +193,7 @@ async def _test(uid):
         guild = await client.fetch_guild(TIAMAT_GUILD_ID, with_counts=True)
         member = await guild.fetch_member(uid)
         channel = await client.fetch_channel(STAFF_CHANNEL_ID)
-        number = guild.approximate_member_count or 0
-        content = "🧪 **Prueba de la bienvenida** (sin mención; así lo verá cada persona nueva en #general)\n\n" \
-                  + welcome_text(member.id, number)
-        raw = await member.display_avatar.replace(format="png", size=512).read()
-        png = await asyncio.to_thread(tiamat_card.card, card_name(member.display_name, member.name), number, raw)
-        msg = await channel.send(content=content, file=discord.File(io.BytesIO(png), filename="bienvenida.png"),
-                                 view=buttons(), allowed_mentions=discord.AllowedMentions.none())
-        await msg.add_reaction("👋")
+        msg = await send_card(channel, member, guild.approximate_member_count or 0, test=True)
         print("prueba enviada:", msg.jump_url)
     finally:
         await client.close()
