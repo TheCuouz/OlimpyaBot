@@ -165,3 +165,9 @@ class TestFlush(unittest.IsolatedAsyncioTestCase):
             tw.send_card.assert_not_awaited()
             channel.send.assert_awaited_once()
             self.assertIn("<@100>", channel.send.await_args.kwargs["content"])
+
+
+class TestChannel(unittest.TestCase):
+    def test_cards_go_to_bienvenida(self):
+        from utils import tiamat_welcome as tw
+        self.assertEqual(tw.CHANNEL_ID, 1557893268883374140)

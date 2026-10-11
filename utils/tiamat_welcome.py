@@ -1,4 +1,4 @@
-"""Welcome of Tiamat Network: a card + a short message in #general for each new member.
+"""Welcome of Tiamat Network: a card + a short message in #bienvenida for each new member.
 
 Only the Tiamat guild uses this; TTS Dev SL keeps its own (off) welcome in cogs/events.py.
 - join-and-leave within 15 min deletes the card; a rejoin within 24 h gets no second card
@@ -18,7 +18,7 @@ from utils import tiamat_card
 from utils.logger import logger
 
 TIAMAT_GUILD_ID = 1557892821099348100
-CHANNEL_ID = 1557893305533210664     # #general
+CHANNEL_ID = 1557893268883374140     # #bienvenida (read-only; members can still react)
 STAFF_CHANNEL_ID = 1557893376362156132
 RULES_ID = 1557893272473571520       # #normas
 LINKS_ID = 1557893275577352192       # #enlaces
@@ -122,7 +122,7 @@ async def render(member, number):
 async def send_card(channel, member, number, test=False):
     content = welcome_text(member.id, number)
     if test:
-        content = "🧪 **Prueba de la bienvenida** (sin mención; así lo verá cada persona nueva en #general)\n\n" + content
+        content = "🧪 **Prueba de la bienvenida** (sin mención; así lo verá cada persona nueva en #bienvenida)\n\n" + content
     msg = await channel.send(content=content, file=await render(member, number), view=buttons(),
                              allowed_mentions=discord.AllowedMentions.none() if test
                              else discord.AllowedMentions(everyone=False, roles=False, users=[member]))
