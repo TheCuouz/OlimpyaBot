@@ -3,13 +3,18 @@ from discord.ext import commands
 from utils.logger import logger
 from config import (
     AUTOROLE_ID, WELCOME_CHANNEL_ID, CHAT_CHANNEL_ID, PRESENTACIONES_CHANNEL_ID,
-    COMIENZA_AQUI_CHANNEL_ID, LOG_CHANNEL_ID,
+    COMIENZA_AQUI_CHANNEL_ID, LOG_CHANNEL_ID, GUILD_ID, DATA_DIR,
 )
+from utils.tiamat_welcome import TIAMAT_GUILD_ID, TiamatWelcomer
+
+# Presence is global (one per bot), so it names something valid for every brand.
+PRESENCE = "tiamatmc.net"
 
 
 class Events(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.tiamat = TiamatWelcomer(bot, DATA_DIR)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -17,7 +22,7 @@ class Events(commands.Cog):
         logger.info(f"Conectado a {len(self.bot.guilds)} servidor(es)")
         await self.bot.change_presence(
             activity=discord.Activity(
-                type=discord.ActivityType.watching, name="/verify · /vouch · tickets"
+                type=discord.ActivityType.watching, name=PRESENCE
             )
         )
 
@@ -31,8 +36,13 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        """Al entrar un nuevo miembro: le asigna el autorol y le da la bienvenida."""
+        """Each guild has its own welcome: Tiamat gets the card; TTS Dev SL autorole, log and welcome."""
         logger.info(f"Nuevo miembro: {member} ({member.id}) en {member.guild.name}")
+        if member.guild.id == TIAMAT_GUILD_ID:
+            await self.tiamat.join(member)
+            return
+        if member.guild.id != GUILD_ID:
+            return
         await self._log(member.guild, f"📥 {member.mention} joined · account created <t:{int(member.created_at.timestamp())}:R>")
         if member.bot:
             return
@@ -41,6 +51,11 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
+        if member.guild.id == TIAMAT_GUILD_ID:
+            await self.tiamat.leave(member)
+            return
+        if member.guild.id != GUILD_ID:
+            return
         await self._log(member.guild, f"📤 {member.mention} ({member}) left")
 
     async def _log(self, guild, text):
