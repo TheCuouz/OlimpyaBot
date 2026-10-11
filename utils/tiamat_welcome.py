@@ -14,6 +14,7 @@ import os
 
 import discord
 
+from config import TIAMAT_FOUNDER_ROLE_ID, TIAMAT_FOUNDER_UNTIL
 from utils import tiamat_card
 from utils.logger import logger
 
@@ -30,10 +31,16 @@ DELETE_IF_LEFT = dt.timedelta(minutes=15)
 NO_REPEAT = dt.timedelta(hours=24)
 KEEP = dt.timedelta(days=30)
 OPENING_TS = int(tiamat_card.OPENING.timestamp())
+FOUNDER_UNTIL = dt.datetime.fromisoformat(TIAMAT_FOUNDER_UNTIL)
+FOUNDER_LINE = "-# Has entrado antes de la apertura: eres Fundador 🐉"
 
 
 def now_utc():
     return dt.datetime.now(dt.timezone.utc)
+
+
+def is_founder_time(now=None):
+    return (now or now_utc()) < FOUNDER_UNTIL
 
 
 def welcome_text(uid, number, now=None):
@@ -45,13 +52,15 @@ def welcome_text(uid, number, now=None):
             f"📜 Antes de nada, lee las <#{RULES_ID}>. Son cortas.\n"
             "⛏️ Se entra con Minecraft Java, de la 1.8 a la 1.21, en `play.tiamatmc.net`.\n"
             f"{when}\n"
-            f"❓ Si te atascas, pregunta en <#{HELP_ID}> y te echamos una mano.")
+            f"❓ Si te atascas, pregunta en <#{HELP_ID}> y te echamos una mano."
+            + (f"\n{FOUNDER_LINE}" if is_founder_time(now) else ""))
 
 
 def group_text(uids, number):
     names = ", ".join(f"<@{u}>" for u in uids)
     return (f"🐉 Damos la bienvenida a Tiamat Network a {names}. Ya somos **{number}** en el Discord.\n\n"
-            f"📜 Las normas están en <#{RULES_ID}> y se entra con Minecraft Java en `play.tiamatmc.net`.")
+            f"📜 Las normas están en <#{RULES_ID}> y se entra con Minecraft Java en `play.tiamatmc.net`."
+            + ("\n-# Por entrar antes de la apertura, cada uno recibe el rol Fundador 🐉" if is_founder_time() else ""))
 
 
 def card_name(display, username):
@@ -133,6 +142,23 @@ async def send_card(channel, member, number, test=False):
     return msg
 
 
+async def give_founder(member, now=None):
+    """Fundador role for anyone who joins before the opening (rejoins included)."""
+    if not TIAMAT_FOUNDER_ROLE_ID or not is_founder_time(now):
+        return False
+    role = member.guild.get_role(TIAMAT_FOUNDER_ROLE_ID)
+    if role is None:
+        logger.warning(f"Tiamat: el rol Fundador {TIAMAT_FOUNDER_ROLE_ID} no existe")
+        return False
+    try:
+        await member.add_roles(role, reason="Entró antes de la apertura")
+        logger.info(f"Tiamat: Fundador para {member}")
+        return True
+    except Exception as e:
+        logger.error(f"Tiamat: no pude dar Fundador a {member}: {e}")
+        return False
+
+
 class TiamatWelcomer:
     def __init__(self, bot, data_dir):
         self.bot = bot
@@ -143,6 +169,7 @@ class TiamatWelcomer:
     async def join(self, member):
         if member.bot:
             return
+        await give_founder(member)
         if self.store.recently_welcomed(member.id):
             logger.info(f"Tiamat: {member} vuelve a entrar en menos de 24 h, sin tarjeta")
             return

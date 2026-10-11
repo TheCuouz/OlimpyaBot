@@ -17,6 +17,10 @@ COMIENZA_AQUI_CHANNEL_ID = int(os.getenv("COMIENZA_AQUI_CHANNEL_ID", "0") or 0)
 CHAT_CHANNEL_ID = int(os.getenv("CHAT_CHANNEL_ID", "0") or 0)
 PRESENTACIONES_CHANNEL_ID = int(os.getenv("PRESENTACIONES_CHANNEL_ID", "0") or 0)
 
+# Tiamat Network: whoever joins its Discord before the opening gets the Fundador role (and a line on the card).
+TIAMAT_FOUNDER_ROLE_ID = int(os.getenv("TIAMAT_FOUNDER_ROLE_ID", "1558709285360509068") or 0)
+TIAMAT_FOUNDER_UNTIL = os.getenv("TIAMAT_FOUNDER_UNTIL", "2026-11-01T01:30:00+00:00")  # 31/10 19:30 Mexico
+
 # Staff-only channel where joins, leaves and role grants are written down.
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "1548429770889371778") or 0)
 

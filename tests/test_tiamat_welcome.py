@@ -171,3 +171,31 @@ class TestChannel(unittest.TestCase):
     def test_cards_go_to_bienvenida(self):
         from utils import tiamat_welcome as tw
         self.assertEqual(tw.CHANNEL_ID, 1557893268883374140)
+
+
+class TestFounder(unittest.IsolatedAsyncioTestCase):
+    def member(self):
+        m = MagicMock(bot=False)
+        m.add_roles = AsyncMock()
+        m.guild.get_role.return_value = "ROLE"
+        return m
+
+    def test_cutoff_is_the_opening(self):
+        from utils import tiamat_welcome as tw
+        self.assertEqual(tw.FOUNDER_UNTIL, tiamat_card.OPENING)
+        self.assertTrue(tw.is_founder_time(tiamat_card.OPENING - dt.timedelta(seconds=1)))
+        self.assertFalse(tw.is_founder_time(tiamat_card.OPENING))
+
+    def test_line_only_before_opening(self):
+        from utils.tiamat_welcome import FOUNDER_LINE
+        self.assertIn(FOUNDER_LINE, welcome_text(1, 2, dt.datetime(2026, 10, 20, tzinfo=UTC)))
+        self.assertNotIn("Fundador", welcome_text(1, 2, dt.datetime(2026, 11, 2, tzinfo=UTC)))
+
+    async def test_role_given_before_and_not_after(self):
+        from utils.tiamat_welcome import give_founder
+        m = self.member()
+        self.assertTrue(await give_founder(m, dt.datetime(2026, 10, 20, tzinfo=UTC)))
+        m.add_roles.assert_awaited_once()
+        m2 = self.member()
+        self.assertFalse(await give_founder(m2, dt.datetime(2026, 11, 1, 2, tzinfo=UTC)))
+        m2.add_roles.assert_not_awaited()
