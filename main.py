@@ -14,6 +14,7 @@ class OlimpyaBot(commands.Bot):
         intents.guild_messages = True
         intents.dm_messages = True
         intents.members = True  # necesario para on_member_join (autorol al entrar)
+        intents.invites = True  # GUILD_INVITES: eventos de invitaciones (sistema de invitaciones)
 
         super().__init__(command_prefix="!", intents=intents)
         self.synced = False

@@ -141,6 +141,11 @@ Thumbs.db
 data/*.json
 !data/.gitkeep
 
+# Invite system database (SQLite)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
 # Debug scripts sueltos
 debug_*.py
 

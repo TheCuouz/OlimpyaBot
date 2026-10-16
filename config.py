@@ -60,8 +60,8 @@ INTENTS = {
     "DIRECT_MESSAGES": True,
 }
 
-# Carpeta persistente. En Railway se monta un volumen y se define DATA_DIR=/data;
-# en local cae a ./data. Así los tickets sobreviven a cada redeploy.
+# Carpeta persistente. En el VPS se monta un volumen y se define DATA_DIR=/data;
+# en local cae a ./data. Así los datos sobreviven a cada redeploy.
 DATA_DIR = os.getenv("DATA_DIR", "data")
 
 TICKET_CONFIG = {
@@ -77,6 +77,15 @@ TICKET_CONFIG = {
 
 CLAIMED_KEYS_FILE = os.path.join(DATA_DIR, "claimed_keys.json")
 VOUCHES_FILE = os.path.join(DATA_DIR, "vouches.json")
+
+# Sistema de invitaciones (SQLite en DATA_DIR; volumen persistente en el VPS).
+INVITES_DB_FILE = os.path.join(DATA_DIR, "invites.db")
+# Canal por defecto para los mensajes de entrada/salida de invitaciones. Vacío = no
+# publicar (así NO duplicamos la bienvenida que ya gestiona cogs/events.py).
+INVITE_ANNOUNCE_CHANNEL_ID = int(os.getenv("INVITE_ANNOUNCE_CHANNEL_ID", "0") or 0)
+# Días mínimos de antigüedad de la cuenta para puntuar (cuentas más nuevas se
+# registran pero se excluyen).
+INVITE_RECENT_ACCOUNT_DAYS = int(os.getenv("INVITE_RECENT_ACCOUNT_DAYS", "7") or 7)
 
 EMBED_CONFIG = {
     "colors": {

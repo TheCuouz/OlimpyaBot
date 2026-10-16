@@ -1,4 +1,4 @@
-# Development-only dependencies (not installed on Railway).
+# Development-only dependencies (not installed on the VPS).
 # Las gates 20-tests las usa; instálalas en el .venv del proyecto:
 #   .venv/bin/pip install -r requirements-dev.txt
 -r requirements.txt
