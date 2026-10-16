@@ -7,7 +7,15 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # Server: TTS Dev SL. Every id can be overridden from the environment.
+# OJO: GUILD_ID también decide en qué servidor se manda la bienvenida (cogs/events.py).
 GUILD_ID = int(os.getenv("GUILD_ID", "1506806457813827684") or 0)
+
+# Servidores donde registrar los slash commands (ids separados por comas). Vacío =
+# todos los servidores donde esté el bot, así los comandos aparecen en Tiamat, TTS
+# Dev SL y Fundedlog (antes solo se registraban en GUILD_ID = TTS Dev SL).
+SYNC_GUILD_IDS = [
+    int(x) for x in os.getenv("SYNC_GUILD_IDS", "").replace(" ", "").split(",") if x
+]
 
 # Per-member welcome and autorole are off: Discord's own onboarding picks the
 # language and the Member role. Set the ids to turn them back on.

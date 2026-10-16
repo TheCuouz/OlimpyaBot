@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 import os
 import traceback
-from config import DISCORD_TOKEN, GUILD_ID
+from config import DISCORD_TOKEN, SYNC_GUILD_IDS
 from utils.logger import logger
 
 
@@ -21,12 +21,21 @@ class OlimpyaBot(commands.Bot):
 
     async def setup_hook(self):
         await self.load_cogs()
-        if GUILD_ID:
-            # Guild commands show up at once; global ones can take a while and would duplicate them.
-            guild = discord.Object(id=GUILD_ID)
+        # Register the slash commands in every guild the bot is in (guild commands
+        # show up at once). SYNC_GUILD_IDS can pin an explicit list; empty = all.
+        targets = list(SYNC_GUILD_IDS)
+        if not targets:
+            targets = [guild.id async for guild in self.fetch_guilds()]
+        for guild_id in targets:
+            guild = discord.Object(id=guild_id)
             self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
-            self.tree.clear_commands(guild=None)
+            try:
+                await self.tree.sync(guild=guild)
+                logger.info(f"Slash commands sincronizados en el servidor {guild_id}")
+            except discord.HTTPException as exc:
+                logger.warning(f"No pude sincronizar comandos en {guild_id}: {exc}")
+        # Clear the global scope so the commands don't duplicate across guilds.
+        self.tree.clear_commands(guild=None)
         await self.tree.sync()
         logger.info("Cogs cargados y slash commands sincronizados")
 
